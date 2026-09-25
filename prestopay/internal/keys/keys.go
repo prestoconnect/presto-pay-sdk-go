@@ -107,4 +107,3 @@ func publicRSAKey(pub any) (*rsa.PublicKey, error) {
 	}
 	return key, nil
 }
-
