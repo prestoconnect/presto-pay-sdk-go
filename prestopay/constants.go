@@ -7,6 +7,16 @@ const (
 	TxnTypeMiniAppPay = "MiniAppPay"
 )
 
+// Webhook event codes. Open-ended: an unrecognized gateway value passes
+// through as a plain string rather than failing.
+const (
+	EventCodeAuthorised = "Authorised"
+	EventCodeCancelled  = "Cancelled"
+	EventCodeReversed   = "Reversed"
+	EventCodeRefunded   = "Refunded"
+	EventCodeExpired    = "Expired"
+)
+
 // Payment statuses. Open-ended: an unrecognized gateway value passes through
 // as a plain string rather than failing.
 const (

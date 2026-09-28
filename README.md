@@ -11,12 +11,11 @@ still move.** See [go-plan.md](../go-plan.md) for the full design and milestones
 
 ## Status
 
-Milestones 1–4 are complete: module and package layout, CI, `prestopay.New` (client and key validation), the
-error types, key loading, canonicalization, timestamp formatting, and the four payment operations (`Init`,
-`Query`, `Reverse`, `Refund`) with validation, response mapping, and the `Raw` escape hatch are all implemented
-and tested today. Webhook verification and `ConfigFromEnv` are **not yet implemented** — see
-[go-plan.md §12](../go-plan.md#12-milestones) for the milestone list. Sections below marked **Planned** preview
-the intended shape from the plan and will change before release.
+Milestones 1–5 are complete: module and package layout, CI, `prestopay.New` (client and key validation), the
+error types, key loading, canonicalization, timestamp formatting, the four payment operations (`Init`, `Query`,
+`Reverse`, `Refund`) with validation, response mapping, and the `Raw` escape hatch, webhook verification, and
+`ConfigFromEnv` are all implemented and tested today. Remaining work — samples, release engineering — is tracked
+in [go-plan.md §12](../go-plan.md#12-milestones).
 
 ## Contents
 
@@ -75,7 +74,12 @@ client can use several `prestoMrn`s under its `mid`. To serve several merchants,
 
 ## Configuration from environment
 
-**Planned.** `prestopay.ConfigFromEnv` will build a `Config` from these variables (see
+```go
+cfg, err := prestopay.ConfigFromEnv(os.Getenv)
+client, err := prestopay.New(cfg)
+```
+
+`ConfigFromEnv` builds a `Config` from these variables (see
 [go-plan.md §8](../go-plan.md#8-configuration-and-keys)):
 
 | Variable | Description |
@@ -111,8 +115,7 @@ res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
 
 ## Webhooks
 
-**Planned.** `NewWebhookVerifier` is not implemented yet (see
-[go-plan.md §7](../go-plan.md#7-webhooks)):
+See [go-plan.md §7](../go-plan.md#7-webhooks) for the full design:
 
 ```go
 v, err := prestopay.NewWebhookVerifier(prestopay.WebhookConfig{
@@ -134,8 +137,8 @@ http.HandleFunc("/presto/notify", func(w http.ResponseWriter, r *http.Request) {
 })
 ```
 
-A verifier will need no private key, so a webhook-only service can configure nothing else and never hold signing
-material. `MerchantIDs` will be a set — Presto signs webhooks for every merchant with the same key, so the `mid`
+A verifier needs no private key, so a webhook-only service configures nothing else and never holds signing
+material. `MerchantIDs` is a set — Presto signs webhooks for every merchant with the same key, so the `mid`
 check is mandatory, not defensive.
 
 ## Errors

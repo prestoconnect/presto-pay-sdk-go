@@ -20,7 +20,7 @@ func TestConstants_NameIsPrefixPlusValue(t *testing.T) {
 		t.Fatalf("parsing constants.go: %v", err)
 	}
 
-	prefixes := []string{"TxnType", "PaymentStatus", "ReversalStatus", "RefundStatus", "PaymentMethod"}
+	prefixes := []string{"TxnType", "PaymentStatus", "ReversalStatus", "RefundStatus", "PaymentMethod", "EventCode"}
 	checked := 0
 
 	for _, decl := range file.Decls {
