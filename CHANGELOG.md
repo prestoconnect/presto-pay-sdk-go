@@ -2,9 +2,9 @@
 
 All notable changes to this project are documented in this file.
 
-## Unreleased
+## 0.1.0 - 2026-09-28
 
-Pre-1.0; nothing has been tagged yet.
+First tagged release.
 
 ### Added
 
@@ -40,4 +40,3 @@ Pre-1.0; nothing has been tagged yet.
   and in the key-loading error messages).
 - The shared wire-contract test vectors are not yet vendored into `spec/`; contract tests are hand-written against
   captured request/response examples instead.
-- No release has been tagged yet.

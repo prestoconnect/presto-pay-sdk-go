@@ -29,7 +29,8 @@ still move.**
 go get github.com/prestoconnect/presto-pay-sdk-go
 ```
 
-Pre-1.0, so pin a specific tag or commit rather than tracking the module unpinned.
+Pre-1.0, so pin a specific tag rather than tracking the module unpinned, e.g.
+`go get github.com/prestoconnect/presto-pay-sdk-go@v0.1.0`.
 
 ## Quick start
 
