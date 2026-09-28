@@ -54,7 +54,7 @@ res, err := client.Payments.Init(ctx, prestopay.InitRequest{
     Amount:       10_000,
     CurrencyCode: "MYR",
     NotifyURL:    "https://your-app.example/presto/notify",
-    RedirectURL:  "https://your-app.example/presto/return",
+    RedirectURL:  "https://your-app.example/presto/return/order-123",
 })
 if err != nil {
     // see Errors below
