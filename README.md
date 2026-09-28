@@ -187,8 +187,10 @@ redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves ar
 - [examples/lambda/](examples/lambda/) — a webhook-only receiver deployed as an AWS Lambda function behind API
   Gateway, holding no private key since verification needs none.
 
-`examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies and a `replace`
-directive pointing at the local SDK source — the SDK module itself stays dependency-free.
+`examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies, depending on the
+tagged `v0.1.0` release like any other consumer would — the SDK module itself stays dependency-free.
+`examples/net-http` has no `go.mod` of its own; it's part of the root module and always builds against the
+current source.
 
 ## Contributing
 
