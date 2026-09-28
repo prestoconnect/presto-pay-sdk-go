@@ -2,6 +2,15 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Changed
+
+- The staging smoke test now also exercises `Reverse` and `Refund` on a `PendingAuthorise` payment. This found
+  another wrong assumption: `Reverse` on a payment that was never paid **succeeds** and cancels it
+  (`PaymentStatus` becomes `Cancelled`) rather than failing — there is nothing to reverse financially if nothing
+  was ever paid. `Refund` in the same state is correctly rejected with error `1227`.
+
 ## 0.1.0 - 2026-09-28
 
 First tagged release.

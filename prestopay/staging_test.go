@@ -4,6 +4,7 @@ package prestopay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -11,12 +12,16 @@ import (
 )
 
 // TestStagingSmoke calls Presto's real staging gateway: Init, an immediate
-// Query, and a duplicate Init confirming the gateway's idempotent-retry
-// behavior — Init on an existing TxnRefNum returns that payment's current
-// status rather than error 1203. It is excluded from the default build
-// entirely (build tag) and, even under -tags staging, still requires an
-// explicit opt-in, since it needs real credentials and creates a real (if
-// unauthorized) payment record on every run.
+// Query, a duplicate Init confirming the gateway's idempotent-retry behavior
+// (Init on an existing TxnRefNum returns that payment's current status
+// rather than error 1203), a Reverse on that same still-PendingAuthorise
+// payment (which cancels it rather than failing — there is nothing to
+// reverse financially if nothing was ever paid), and a Refund attempt on a
+// second, separate PendingAuthorise payment (which is correctly rejected
+// with error 1227, since nothing has been paid to refund). It is excluded
+// from the default build entirely (build tag) and, even under -tags
+// staging, still requires an explicit opt-in, since it creates real
+// (if unauthorized) payment records on every run.
 func TestStagingSmoke(t *testing.T) {
 	if os.Getenv("PRESTOPAY_STAGING_SMOKE") != "1" {
 		t.Skip("set PRESTOPAY_STAGING_SMOKE=1 to run this test against the real Presto staging gateway")
@@ -95,5 +100,67 @@ func TestStagingSmoke(t *testing.T) {
 	if dupRes.PaymentStatus != queryRes.PaymentStatus {
 		t.Errorf("duplicate Init: PaymentStatus = %q, want %q (the existing record's current status)",
 			dupRes.PaymentStatus, queryRes.PaymentStatus)
+	}
+
+	// Reversing a payment that was never paid cancels it rather than
+	// failing: there is nothing to reverse financially, so the gateway
+	// treats it as a cancellation. (An earlier version of this test assumed
+	// Reverse would be rejected here; real staging traffic showed otherwise.)
+	reverseRefNum := fmt.Sprintf("smoke-rev-%d", time.Now().UnixNano())
+	reverseRes, err := client.Payments.Reverse(ctx, ReverseRequest{
+		PrestoMRN:      prestoMRN,
+		PaymentRefNum:  initRes.PaymentRefNum,
+		ReversalRefNum: reverseRefNum,
+		Remark:         "staging smoke test",
+	})
+	if err != nil {
+		t.Fatalf("Reverse on a PendingAuthorise payment should succeed (cancelling it): %v", err)
+	}
+	if reverseRes.PaymentRefNum != initRes.PaymentRefNum {
+		t.Errorf("Reverse: PaymentRefNum = %q, want %q", reverseRes.PaymentRefNum, initRes.PaymentRefNum)
+	}
+	if reverseRes.PaymentStatus != PaymentStatusCancelled {
+		t.Errorf("Reverse: PaymentStatus = %q, want %q", reverseRes.PaymentStatus, PaymentStatusCancelled)
+	}
+
+	// Refund has no such carve-out: a second, untouched PendingAuthorise
+	// payment is correctly rejected, since nothing has been paid yet.
+	txnRefNum2 := fmt.Sprintf("smoke-2-%d", time.Now().UnixNano())
+	initRes2, err := client.Payments.Init(ctx, InitRequest{
+		PrestoMRN:    prestoMRN,
+		TxnType:      TxnTypeWebPay,
+		TxnRefNum:    txnRefNum2,
+		DisplayDesc:  "Go SDK staging smoke test (refund check)",
+		Amount:       100,
+		CurrencyCode: "MYR",
+		NotifyURL:    "https://example.invalid/presto/notify",
+		RedirectURL:  "https://example.invalid/presto/return/" + txnRefNum2,
+	})
+	if err != nil {
+		t.Fatalf("Init (second payment, for the Refund check): %v", err)
+	}
+
+	refundRefNum := fmt.Sprintf("smoke-rfnd-%d", time.Now().UnixNano())
+	_, err = client.Payments.Refund(ctx, RefundRequest{
+		PrestoMRN:     prestoMRN,
+		PaymentRefNum: initRes2.PaymentRefNum,
+		RefundRefNum:  refundRefNum,
+		Remark:        "staging smoke test",
+	})
+	if err == nil {
+		t.Fatal("Refund on a PendingAuthorise payment should fail: nothing has been paid yet")
+	}
+	var refundErr *APIError
+	if !errors.As(err, &refundErr) {
+		t.Fatalf("Refund error = %v (%T), want *APIError", err, err)
+	}
+	if refundErr.Kind != KindBusiness {
+		t.Errorf("Refund: Kind = %v, want KindBusiness", refundErr.Kind)
+	}
+	if refundErr.ErrorCode != ErrorCodeInvalidStatusForRefund {
+		t.Errorf("Refund: ErrorCode = %q, want %q (%s)", refundErr.ErrorCode, ErrorCodeInvalidStatusForRefund, refundErr.ErrorMessage)
+	}
+	if refundErr.MayHaveTakenEffect() {
+		t.Error("Refund rejected for invalid payment state should not be ambiguous: nothing happened")
 	}
 }
