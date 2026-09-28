@@ -101,7 +101,7 @@ func validInitRequest() InitRequest {
 func writeJSON(w http.ResponseWriter, status int, body []byte) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(status)
-	w.Write(body)
+	_, _ = w.Write(body)
 }
 
 func TestPayments_Init_Success(t *testing.T) {

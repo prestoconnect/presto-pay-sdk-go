@@ -90,10 +90,7 @@ func Classify(err error) (beforeAnyWrite bool) {
 		return true
 	}
 	var certInvalidErr x509.CertificateInvalidError
-	if errors.As(err, &certInvalidErr) {
-		return true
-	}
-	return false
+	return errors.As(err, &certInvalidErr)
 }
 
 // RetryPolicy governs whether and how a failed attempt is retried.

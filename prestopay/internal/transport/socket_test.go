@@ -124,7 +124,7 @@ func TestSocket_ResetAfterBodyWritten(t *testing.T) {
 		_, _ = bufio.NewReader(conn).ReadString('\n')
 		close(accepted)
 		if tc, ok := conn.(*net.TCPConn); ok {
-			tc.SetLinger(0) // force RST instead of a graceful FIN
+			_ = tc.SetLinger(0) // force RST instead of a graceful FIN
 		}
 	}()
 
