@@ -4,8 +4,7 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
-Pre-1.0; nothing has been tagged yet. Tracking work toward the v0.1.0 release described in
-[go-plan.md §12](../go-plan.md#12-milestones).
+Pre-1.0; nothing has been tagged yet.
 
 ### Added
 
@@ -25,13 +24,15 @@ Pre-1.0; nothing has been tagged yet. Tracking work toward the v0.1.0 release de
   variants for keys.
 - `1005` business errors report the observed clock offset between the request and response timestamps
   (`APIError.ClockOffset`); `1006`/`1007` attach the canonical string that failed to verify (`APIError.Canonical`).
-- `examples/net-http/`: a runnable demo against Presto's real staging gateway using only `net/http`.
+- `examples/net-http/`: a runnable demo against Presto's real staging gateway using only `net/http` and
+  `html/template`.
+- `examples/chi/`: the same demo routed with `chi` instead of the stdlib mux.
+- `examples/lambda/`: a webhook-only receiver deployed as an AWS Lambda function behind API Gateway.
 
 ### Known limitations
 
 - No PKCS#12 support — the onboarding keystore must be converted once with `openssl` (documented in the README
   and in the key-loading error messages).
-- `presto-pay-spec`'s vectors are not yet vendored into `spec/`; contract tests are hand-written against the
-  worked examples in `go-plan.md` §3.4 instead (Milestone 0 is still open).
-- No release has been tagged; `examples/chi/` and `examples/lambda/`, a staging smoke test, and publishing to
-  pkg.go.dev are still open per go-plan.md §12.
+- `presto-pay-spec`'s vectors are not yet vendored into `spec/`; contract tests are hand-written against captured
+  request/response examples instead.
+- No release has been tagged; a staging smoke test and publishing to pkg.go.dev are still open.

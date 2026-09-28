@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Presto Pay SDK — chi demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #222; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    input, select { width: 100%; padding: 8px; box-sizing: border-box; font-size: 14px; }
+    button { margin-top: 20px; padding: 10px 20px; font-size: 14px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    td, th { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 13px; }
+    .toggle a { margin-right: 8px; }
+    .toggle strong { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <h1>Presto Pay SDK — chi demo</h1>
+  <p>Every submitted payment starts a real call to the configured Presto staging gateway.</p>
+
+  <p class="toggle">
+    Who picks the payment method?
+    <a href="/?showMethods=0">{{if .ShowMethods}}Presto's hosted page{{else}}<strong>Presto's hosted page</strong>{{end}}</a>
+    <a href="/?showMethods=1">{{if .ShowMethods}}<strong>this site</strong>{{else}}this site{{end}}</a>
+  </p>
+
+  <form method="post" action="/checkout">
+    <label for="amount">Amount (minor units)</label>
+    <input type="number" id="amount" name="amount" value="1000" required>
+
+    <label for="currencyCode">Currency</label>
+    <input type="text" id="currencyCode" name="currencyCode" value="MYR" required>
+
+    {{if .ShowMethods}}
+    <label for="paymentMethod">Payment method</label>
+    <select id="paymentMethod" name="paymentMethod">
+      {{range .PaymentMethods}}<option value="{{.}}">{{.}}</option>{{end}}
+    </select>
+    {{end}}
+
+    <button type="submit">Pay</button>
+  </form>
+
+  {{if .Events}}
+  <h2>Recent webhooks</h2>
+  <table>
+    <tr><th>Received</th><th>Event</th><th>Payment ref</th><th>Status</th></tr>
+    {{range .Events}}
+    <tr><td>{{.ReceivedAt}}</td><td>{{.EventCode}}</td><td>{{.PaymentRefNum}}</td><td>{{.PaymentStatus}}</td></tr>
+    {{end}}
+  </table>
+  {{end}}
+</body>
+</html>

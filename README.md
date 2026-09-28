@@ -3,7 +3,7 @@
 [![CI](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml)
 
 Standalone, framework-agnostic Go library for the **Presto Connect** payment gateway. **Pre-1.0 — the API can
-still move.** See [go-plan.md](../go-plan.md) for the full design and milestones this repository follows.
+still move.**
 
 - **Go 1.24+** (1.24, 1.25, 1.26 in CI) — no build tags, no cgo
 - **Zero dependencies** — stdlib only
@@ -11,12 +11,11 @@ still move.** See [go-plan.md](../go-plan.md) for the full design and milestones
 
 ## Status
 
-Milestones 1–5 are complete: module and package layout, CI, `prestopay.New` (client and key validation), the
-error types, key loading, canonicalization, timestamp formatting, the four payment operations (`Init`, `Query`,
-`Reverse`, `Refund`) with validation, response mapping, and the `Raw` escape hatch, webhook verification, and
-`ConfigFromEnv` are all implemented and tested today. See [CHANGELOG.md](CHANGELOG.md) for details. Remaining
-work — the wire-contract vectors, more examples, release engineering — is tracked in
-[go-plan.md §12](../go-plan.md#12-milestones).
+Client construction and key validation, the error types, key loading, canonicalization, timestamp formatting,
+the four payment operations (`Init`, `Query`, `Reverse`, `Refund`) with validation, response mapping, and the
+`Raw` escape hatch, webhook verification, and `ConfigFromEnv` are all implemented and tested today. See
+[CHANGELOG.md](CHANGELOG.md) for details. Remaining work — vendoring the shared wire-contract test vectors, a
+staging smoke test, and tagging a first release — is still open.
 
 ## Contents
 
@@ -80,8 +79,7 @@ cfg, err := prestopay.ConfigFromEnv(os.Getenv)
 client, err := prestopay.New(cfg)
 ```
 
-`ConfigFromEnv` builds a `Config` from these variables (see
-[go-plan.md §8](../go-plan.md#8-configuration-and-keys)):
+`ConfigFromEnv` builds a `Config` from these variables:
 
 | Variable | Description |
 |----------|-------------|
@@ -120,8 +118,7 @@ res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
 ```
 
 `Query` is read-only and safe to retry; `Config.RetryReads` governs how many times and how it backs off for
-`Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too. See
-[go-plan.md §3.9](../go-plan.md#39-idempotency-and-retries).
+`Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too.
 
 If you supply a custom `Config.HTTPClient` or `Transport`, never set an `Idempotency-Key` or
 `X-Idempotency-Key` header: `net/http` treats a POST carrying either as replayable and may silently resend it on
@@ -129,8 +126,6 @@ a broken idle connection, which is exactly the transparent retry this SDK's idem
 not happening.
 
 ## Webhooks
-
-See [go-plan.md §7](../go-plan.md#7-webhooks) for the full design:
 
 ```go
 v, err := prestopay.NewWebhookVerifier(prestopay.WebhookConfig{
@@ -190,5 +185,10 @@ redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves ar
 - [examples/net-http/](examples/net-http/) — a runnable demo against Presto's real staging gateway using only
   `net/http` and `html/template`: a checkout page with a hosted-vs-self-selected payment method toggle, a return
   page, JSON endpoints for query/reverse/refund, and webhook handling that dedupes on `EventRefNum`.
+- [examples/chi/](examples/chi/) — the same demo routed with [chi](https://github.com/go-chi/chi) instead of the
+  stdlib mux, showing the SDK is router-agnostic.
+- [examples/lambda/](examples/lambda/) — a webhook-only receiver deployed as an AWS Lambda function behind API
+  Gateway, holding no private key since verification needs none.
 
-More examples (`chi`, Lambda) are tracked in [go-plan.md §12](../go-plan.md#12-milestones).
+`examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies and a `replace`
+directive pointing at the local SDK source — the SDK module itself stays dependency-free.
