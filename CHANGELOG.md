@@ -33,6 +33,6 @@ Pre-1.0; nothing has been tagged yet.
 
 - No PKCS#12 support — the onboarding keystore must be converted once with `openssl` (documented in the README
   and in the key-loading error messages).
-- `presto-pay-spec`'s vectors are not yet vendored into `spec/`; contract tests are hand-written against captured
-  request/response examples instead.
+- The shared wire-contract test vectors are not yet vendored into `spec/`; contract tests are hand-written against
+  captured request/response examples instead.
 - No release has been tagged; a staging smoke test and publishing to pkg.go.dev are still open.
