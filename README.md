@@ -97,6 +97,15 @@ exists), so convert it once with `openssl`:
 openssl pkcs12 -in partner.p12 -nocerts -nodes -out partner-key.pem
 ```
 
+**This command can exit non-zero on some keystores, but still work.** Some `.p12` files encrypt their
+certificate bag with an older algorithm (e.g. RC2-40-CBC) that OpenSSL 3 refuses by default, so it prints
+something like `digital envelope routines:inner_evp_generic_fetch:unsupported` and returns exit code 1 — but
+only *after* writing `partner-key.pem`, since the private key itself commonly uses an algorithm OpenSSL 3 does
+support. Check the output file: if it contains a `BEGIN PRIVATE KEY` block, the conversion succeeded and the
+error can be ignored. For a clean exit code, prepend `-legacy` (`openssl pkcs12 -legacy -in ...`); this needs the
+legacy provider available in your OpenSSL build (`openssl list -provider legacy -providers`), which stock builds
+sometimes omit.
+
 ## Retries and idempotency
 
 `Init`, `Reverse`, and `Refund` are **not** safely retried after the request may have reached Presto — they are
