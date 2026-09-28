@@ -124,7 +124,7 @@ func TestSignatureError_WebhookNeverAmbiguous(t *testing.T) {
 func TestSignatureError_ResponseAmbiguousForWrites(t *testing.T) {
 	e := newSignatureError(OpReverse, "response", "a:b:c", false)
 	if !e.MayHaveTakenEffect() {
-		t.Fatal("a response signature failure on Reverse is ambiguous per go-plan.md §3.6 step 3")
+		t.Fatal("a response signature failure on a write operation is ambiguous: the request may have reached the gateway before the response failed to verify")
 	}
 }
 
