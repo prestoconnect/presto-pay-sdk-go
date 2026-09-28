@@ -32,6 +32,7 @@ Pre-1.0; nothing has been tagged yet.
   that calls the real gateway: `Init`, an immediate `Query`, and a duplicate `Init` confirming Presto's own
   idempotent-by-`TxnRefNum` behavior (returns the existing payment's current status rather than creating a
   second record).
+- `LICENSE` (Apache 2.0, matching the Java and JS SDKs), `CONTRIBUTING.md`, and `SECURITY.md`.
 
 ### Known limitations
 
@@ -39,4 +40,4 @@ Pre-1.0; nothing has been tagged yet.
   and in the key-loading error messages).
 - The shared wire-contract test vectors are not yet vendored into `spec/`; contract tests are hand-written against
   captured request/response examples instead.
-- No release has been tagged; publishing to pkg.go.dev is still open.
+- No release has been tagged yet.

@@ -1,6 +1,7 @@
 # presto-pay-sdk-go
 
 [![CI](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 Standalone, framework-agnostic Go library for the **Presto Connect** payment gateway. **Pre-1.0 — the API can
 still move.**
@@ -19,6 +20,8 @@ still move.**
 - [Webhooks](#webhooks)
 - [Errors](#errors)
 - [Samples](#samples)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Install
 
@@ -186,3 +189,11 @@ redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves ar
 
 `examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies and a `replace`
 directive pointing at the local SDK source — the SDK module itself stays dependency-free.
+
+## Contributing
+
+Building, testing, code style, and the release process live in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+Apache License 2.0 — see [LICENSE](LICENSE).

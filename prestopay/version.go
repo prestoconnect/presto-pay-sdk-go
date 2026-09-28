@@ -2,4 +2,4 @@
 package prestopay
 
 // Version is the SDK version, sent as part of the User-Agent header.
-const Version = "0.1.0-dev"
+const Version = "0.1.0"
