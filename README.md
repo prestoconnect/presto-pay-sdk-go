@@ -119,10 +119,9 @@ res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
 `Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too.
 
 `Reverse` on a payment that's still `PendingAuthorise` (never paid) cancels it rather than failing — there's
-nothing to reverse financially. A `PendingAuthorise` payment auto-expires (`PaymentStatus` becomes `Expired`)
-somewhere between 13 and 107 minutes after `Init` — confirmed against real staging traffic, though the exact
-cutoff is narrower than that and unconfirmed (roughly 15 minutes per additional guidance). Once `Expired`,
-`Reverse` fails with error `1219` rather than cancelling it.
+nothing to reverse financially. A `PendingAuthorise` payment expires (`PaymentStatus` becomes `Expired`) 15
+minutes after `Init` if not finalised by then — a confirmed business rule, consistent with real staging traffic.
+Once `Expired`, `Reverse` fails with error `1219` rather than cancelling it.
 
 If you supply a custom `Config.HTTPClient` or `Transport`, never set an `Idempotency-Key` or
 `X-Idempotency-Key` header: `net/http` treats a POST carrying either as replayable and may silently resend it on

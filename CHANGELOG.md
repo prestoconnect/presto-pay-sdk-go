@@ -10,9 +10,9 @@ All notable changes to this project are documented in this file.
   another wrong assumption: `Reverse` on a payment that was never paid **succeeds** and cancels it
   (`PaymentStatus` becomes `Cancelled`) rather than failing — there is nothing to reverse financially if nothing
   was ever paid. `Refund` in the same state is correctly rejected with error `1227`.
-- README: a `PendingAuthorise` payment auto-expires (`PaymentStatus` becomes `Expired`) somewhere between 13 and
-  107 minutes after `Init` — confirmed against real staging traffic. Once `Expired`, `Reverse` fails with error
-  `1219` rather than cancelling it. (An earlier version of this entry guessed error `1221`; that guess was wrong.)
+- README: a `PendingAuthorise` payment expires (`PaymentStatus` becomes `Expired`) 15 minutes after `Init` if not
+  finalised by then — a confirmed business rule. Once `Expired`, `Reverse` fails with error `1219` rather than
+  cancelling it. (An earlier version of this entry guessed error `1221`; that guess was wrong.)
 
 ## 0.1.0 - 2026-09-28
 
