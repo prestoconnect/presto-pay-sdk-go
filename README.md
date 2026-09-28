@@ -107,9 +107,11 @@ sometimes omit.
 
 ## Retries and idempotency
 
-`Init`, `Reverse`, and `Refund` are **not** safely retried after the request may have reached Presto — they are
-retried automatically only when an `httptrace`-proven `RequestNotSent` shows nothing reached the gateway. A
-duplicate `TxnRefNum` on `Init` returns error `1203`; reconcile with `Query` rather than re-calling `Init`:
+`Init`, `Reverse`, and `Refund` are **not** safely retried automatically after the request may have reached
+Presto — the SDK retries them only when an `httptrace`-proven `RequestNotSent` shows nothing reached the
+gateway. Presto's own `Init` is idempotent by `TxnRefNum` (a duplicate call returns the existing payment's
+current status rather than creating a second record), but after an ambiguous failure the SDK still can't tell
+you that without asking, so reconcile with `Query`:
 
 ```go
 res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
@@ -197,9 +199,10 @@ directive pointing at the local SDK source — the SDK module itself stays depen
 ## Staging smoke test
 
 `prestopay/staging_test.go` calls Presto's real staging gateway: `Init`, an immediate `Query` on the same
-transaction, and a duplicate `Init` to confirm error `1203`. It is excluded from the normal build entirely (a
-`staging` build tag) and, even when built with that tag, still requires an explicit opt-in, since it creates a
-real payment record on every run:
+transaction, and a duplicate `Init` confirming the gateway's idempotent-retry behavior (same `PaymentRefNum`)
+while the payment is still `PendingAuthorise`. It is excluded from the normal build entirely (a `staging` build
+tag) and, even when built with that tag, still requires an explicit opt-in, since it creates a real payment
+record on every run:
 
 ```bash
 PRESTOPAY_STAGING_SMOKE=1 go test -tags staging ./prestopay/... -run TestStagingSmoke -v

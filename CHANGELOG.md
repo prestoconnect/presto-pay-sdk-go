@@ -29,7 +29,9 @@ Pre-1.0; nothing has been tagged yet.
 - `examples/chi/`: the same demo routed with `chi` instead of the stdlib mux.
 - `examples/lambda/`: a webhook-only receiver deployed as an AWS Lambda function behind API Gateway.
 - A staging smoke test (`prestopay/staging_test.go`, `-tags staging`, gated behind `PRESTOPAY_STAGING_SMOKE=1`)
-  that calls the real gateway: `Init`, an immediate `Query`, and a duplicate `Init` confirming error `1203`.
+  that calls the real gateway: `Init`, an immediate `Query`, and a duplicate `Init` confirming Presto's own
+  idempotent-by-`TxnRefNum` behavior (returns the existing payment's current status rather than creating a
+  second record).
 
 ### Known limitations
 

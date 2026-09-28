@@ -4,17 +4,19 @@ package prestopay
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 )
 
-// TestStagingSmoke calls Presto's real staging gateway. It is excluded from
-// the default build entirely (build tag) and, even under -tags staging,
-// still requires an explicit opt-in, since it needs real credentials and
-// creates a real (if unauthorized) payment record on every run.
+// TestStagingSmoke calls Presto's real staging gateway: Init, an immediate
+// Query, and a duplicate Init confirming the gateway's idempotent-retry
+// behavior — Init on an existing TxnRefNum returns that payment's current
+// status rather than error 1203. It is excluded from the default build
+// entirely (build tag) and, even under -tags staging, still requires an
+// explicit opt-in, since it needs real credentials and creates a real (if
+// unauthorized) payment record on every run.
 func TestStagingSmoke(t *testing.T) {
 	if os.Getenv("PRESTOPAY_STAGING_SMOKE") != "1" {
 		t.Skip("set PRESTOPAY_STAGING_SMOKE=1 to run this test against the real Presto staging gateway")
@@ -79,25 +81,19 @@ func TestStagingSmoke(t *testing.T) {
 		t.Errorf("Query: PaymentStatus = %q, want %q", queryRes.PaymentStatus, PaymentStatusPendingAuthorise)
 	}
 
-	_, err = client.Payments.Init(ctx, initReq)
-	if err == nil {
-		t.Fatal("Init with a duplicate TxnRefNum should fail with error 1203")
+	// Init on an existing TxnRefNum is idempotent: it always returns that
+	// payment's current status (success:true) rather than error 1203,
+	// regardless of what state the payment has since reached.
+	dupRes, err := client.Payments.Init(ctx, initReq)
+	if err != nil {
+		t.Fatalf("duplicate Init (existing TxnRefNum) should succeed idempotently: %v", err)
 	}
-	var apiErr *APIError
-	if !errors.As(err, &apiErr) {
-		t.Fatalf("duplicate Init error = %v (%T), want *APIError", err, err)
+	if dupRes.PaymentRefNum != initRes.PaymentRefNum {
+		t.Errorf("duplicate Init: PaymentRefNum = %q, want %q (same as the first Init)",
+			dupRes.PaymentRefNum, initRes.PaymentRefNum)
 	}
-	if apiErr.Kind != KindBusiness {
-		t.Errorf("duplicate Init: Kind = %v, want KindBusiness", apiErr.Kind)
-	}
-	if apiErr.ErrorCode != ErrorCodeDuplicateTxnRefNum {
-		t.Errorf("duplicate Init: ErrorCode = %q, want %q", apiErr.ErrorCode, ErrorCodeDuplicateTxnRefNum)
-	}
-	if !apiErr.MayHaveTakenEffect() {
-		t.Error("duplicate Init: MayHaveTakenEffect() = false, want true (1203 means a record exists)")
-	}
-	key, ok := apiErr.ReconcileBy()
-	if !ok || key.TxnRefNum != txnRefNum {
-		t.Errorf("duplicate Init: ReconcileBy() = %+v, %v, want TxnRefNum=%q", key, ok, txnRefNum)
+	if dupRes.PaymentStatus != queryRes.PaymentStatus {
+		t.Errorf("duplicate Init: PaymentStatus = %q, want %q (the existing record's current status)",
+			dupRes.PaymentStatus, queryRes.PaymentStatus)
 	}
 }
