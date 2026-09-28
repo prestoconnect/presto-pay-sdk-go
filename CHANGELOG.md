@@ -13,6 +13,10 @@ All notable changes to this project are documented in this file.
 - README: a `PendingAuthorise` payment expires (`PaymentStatus` becomes `Expired`) 15 minutes after `Init` if not
   finalised by then — a confirmed business rule. Once `Expired`, `Reverse` fails with error `1219` rather than
   cancelling it. (An earlier version of this entry guessed error `1221`; that guess was wrong.)
+- `ErrorCodeGuestAccountRefundNotSupported` (`1242`), captured from a real response: `Reverse`/`Refund` on an
+  authorised payment only work for a non-guest user paying via `Wallet`, `Card` (not `PmPgCard`), `Subwallet_*`,
+  or a subset of loyalty methods — most other methods settle through an offline refund process with no API the
+  gateway can call.
 
 ## 0.1.0 - 2026-09-28
 
