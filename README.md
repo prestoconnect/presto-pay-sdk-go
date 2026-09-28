@@ -13,9 +13,9 @@ still move.**
 
 Client construction and key validation, the error types, key loading, canonicalization, timestamp formatting,
 the four payment operations (`Init`, `Query`, `Reverse`, `Refund`) with validation, response mapping, and the
-`Raw` escape hatch, webhook verification, and `ConfigFromEnv` are all implemented and tested today. See
-[CHANGELOG.md](CHANGELOG.md) for details. Remaining work — vendoring the shared wire-contract test vectors, a
-staging smoke test, and tagging a first release — is still open.
+`Raw` escape hatch, webhook verification, `ConfigFromEnv`, and a staging smoke test verified against the real
+gateway are all implemented and tested today. See [CHANGELOG.md](CHANGELOG.md) for details. Remaining work —
+vendoring the shared wire-contract test vectors and tagging a first release — is still open.
 
 ## Contents
 
@@ -26,6 +26,8 @@ staging smoke test, and tagging a first release — is still open.
 - [Retries and idempotency](#retries-and-idempotency)
 - [Webhooks](#webhooks)
 - [Errors](#errors)
+- [Custom HTTP client](#custom-http-client)
+- [Debugging signatures](#debugging-signatures)
 - [Samples](#samples)
 - [Staging smoke test](#staging-smoke-test)
 
@@ -183,6 +185,24 @@ operation exists.
 `RawBody` and `Canonical` can carry PII (`cardBin`, `cardSummary`, `receiptEmail`, `receiptName`); `Error()`
 redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves are always populated regardless.
 
+## Custom HTTP client
+
+Set `Config.HTTPClient` to use your own client (for proxies, pooling, or tracing); the SDK clones it and forces
+`CheckRedirect` to `http.ErrUseLastResponse` regardless, since a redirect with a signed payment body attached
+must never be followed transparently.
+
+```go
+client, err := prestopay.New(prestopay.Config{
+    // ...
+    HTTPClient: &http.Client{Transport: myTransport},
+})
+```
+
+## Debugging signatures
+
+`prestopay.Canonicalize(fields map[string]any)` reproduces the gateway canonical string from a parsed body, to
+compare against a packet capture. Avoid depending on anything under `internal/` — it is not semver-stable.
+
 ## Samples
 
 - [examples/net-http/](examples/net-http/) — a runnable demo against Presto's real staging gateway using only
@@ -199,10 +219,10 @@ directive pointing at the local SDK source — the SDK module itself stays depen
 ## Staging smoke test
 
 `prestopay/staging_test.go` calls Presto's real staging gateway: `Init`, an immediate `Query` on the same
-transaction, and a duplicate `Init` confirming the gateway's idempotent-retry behavior (same `PaymentRefNum`)
-while the payment is still `PendingAuthorise`. It is excluded from the normal build entirely (a `staging` build
-tag) and, even when built with that tag, still requires an explicit opt-in, since it creates a real payment
-record on every run:
+transaction, and a duplicate `Init` confirming Presto's own idempotent-by-`TxnRefNum` behavior (returns the
+existing payment's current status, same `PaymentRefNum`, rather than creating a second record). It is excluded
+from the normal build entirely (a `staging` build tag) and, even when built with that tag, still requires an
+explicit opt-in, since it creates a real payment record on every run:
 
 ```bash
 PRESTOPAY_STAGING_SMOKE=1 go test -tags staging ./prestopay/... -run TestStagingSmoke -v
