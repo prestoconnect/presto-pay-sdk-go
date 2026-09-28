@@ -78,6 +78,9 @@ type Config struct {
 // A *Client is safe for concurrent use and is meant to be built once and
 // shared, like *sql.DB.
 type Client struct {
+	Payments PaymentsAPI
+	Raw      RawAPI
+
 	config Config
 
 	baseURL string
@@ -156,6 +159,9 @@ func New(cfg Config) (*Client, error) {
 	if c.now == nil {
 		c.now = time.Now
 	}
+
+	c.Payments = PaymentsAPI{client: c}
+	c.Raw = RawAPI{client: c}
 
 	return c, nil
 }

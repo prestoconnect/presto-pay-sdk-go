@@ -37,14 +37,15 @@ type ReconcileKey struct {
 	PaymentRefNum string
 }
 
-// ambiguousWrite reports whether op is one of the three operations for which
-// an ambiguous failure means the request may have reached the gateway
-// (Init, Reverse, Refund). Query is read-only and safe to retry, so a
+// ambiguousWrite reports whether op is one of the operations for which an
+// ambiguous failure means the request may have reached the gateway (Init,
+// Reverse, Refund, and Raw, whose caller-chosen endpoint this SDK cannot
+// classify as idempotent). Query is read-only and safe to retry, so a
 // failure there always means nothing happened; the same is true of Webhook
 // and Config, which never send a request at all.
 func ambiguousWrite(op Operation) bool {
 	switch op {
-	case OpInit, OpReverse, OpRefund:
+	case OpInit, OpReverse, OpRefund, OpRaw:
 		return true
 	default:
 		return false
@@ -65,6 +66,8 @@ func opName(op Operation) string {
 		return "webhook"
 	case OpConfig:
 		return "config"
+	case OpRaw:
+		return "raw"
 	default:
 		return "unknown"
 	}

@@ -154,6 +154,18 @@ func TestResponseError_Unwrap(t *testing.T) {
 	}
 }
 
+func TestTransportError_RawAmbiguousOnlyWhenSent(t *testing.T) {
+	notSent := newTransportError(OpRaw, errors.New("dial tcp: connect: connection refused"), true, nil)
+	if notSent.MayHaveTakenEffect() {
+		t.Fatal("RequestNotSent=true must mean not ambiguous")
+	}
+
+	sent := newTransportError(OpRaw, context.DeadlineExceeded, false, nil)
+	if !sent.MayHaveTakenEffect() {
+		t.Fatal("Raw is unclassified, so RequestNotSent=false must be treated as ambiguous")
+	}
+}
+
 func TestAllErrorTypesImplementError(t *testing.T) {
 	var errs []Error
 	errs = append(errs,

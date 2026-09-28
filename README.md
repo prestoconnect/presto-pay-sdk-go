@@ -11,9 +11,10 @@ still move.** See [go-plan.md](../go-plan.md) for the full design and milestones
 
 ## Status
 
-Milestone 1 (scaffold) is complete: module, package layout, and CI are in place. `prestopay.New` (client and key
-validation), the error types, key loading, canonicalization, and timestamp formatting are implemented today. The
-four payment operations and webhook verification are **not yet implemented** — see
+Milestones 1–4 are complete: module and package layout, CI, `prestopay.New` (client and key validation), the
+error types, key loading, canonicalization, timestamp formatting, and the four payment operations (`Init`,
+`Query`, `Reverse`, `Refund`) with validation, response mapping, and the `Raw` escape hatch are all implemented
+and tested today. Webhook verification and `ConfigFromEnv` are **not yet implemented** — see
 [go-plan.md §12](../go-plan.md#12-milestones) for the milestone list. Sections below marked **Planned** preview
 the intended shape from the plan and will change before release.
 
@@ -37,9 +38,6 @@ go get github.com/prestoconnect/presto-pay-sdk-go
 Pre-1.0, so pin a specific tag or commit rather than tracking the module unpinned.
 
 ## Quick start
-
-> **Planned.** `client.Payments` and the four operations land in Milestone 4. The shape below is the design this
-> SDK is being built to (see [go-plan.md §4](../go-plan.md#4-api)).
 
 ```go
 client, err := prestopay.New(prestopay.Config{
@@ -65,15 +63,15 @@ if err != nil {
 res.PaymentURL
 ```
 
-What works today: `prestopay.New(Config)` builds and validates a `*Client` — merchant ID, private key, and Presto
-public keys are checked eagerly, so a bad key is a `*ConfigError` at construction rather than a mysterious
-failure on the first real call.
+`prestopay.New(Config)` builds and validates a `*Client` — merchant ID, private key, and Presto public keys are
+checked eagerly, so a bad key is a `*ConfigError` at construction rather than a mysterious failure on the first
+real call.
 
 ## Merchant identity
 
-**Planned.** `MerchantID` (`mid`) is set once on `Config` and sent on every request; `PrestoMRN` is set per
-request, so one client can use several `prestoMrn`s under its `mid`. To serve several merchants, build one
-client per `mid` (they can share the same keys) and route each request and webhook to the matching client.
+`MerchantID` (`mid`) is set once on `Config` and sent on every request; `PrestoMRN` is set per request, so one
+client can use several `prestoMrn`s under its `mid`. To serve several merchants, build one client per `mid`
+(they can share the same keys) and route each request to the matching client.
 
 ## Configuration from environment
 
@@ -96,12 +94,20 @@ openssl pkcs12 -in partner.p12 -nocerts -nodes -out partner-key.pem
 
 ## Retries and idempotency
 
-`Config.RetryReads` exists today and is meant to govern retries of `Query`, the one read-only, safe-to-resend
-operation — `Init`, `Reverse`, and `Refund` are never retried by this policy. Since the four operations
-themselves are **not yet implemented**, no retry logic runs yet. Once shipped, `Init`/`Reverse`/`Refund` will
-only be retried automatically when an `httptrace`-proven `RequestNotSent` shows nothing reached the gateway, and
-a duplicate `TxnRefNum` on `Init` will return error `1203` — reconcile with `Query` rather than re-calling
-`Init`. See [go-plan.md §3.9](../go-plan.md#39-idempotency-and-retries).
+`Init`, `Reverse`, and `Refund` are **not** safely retried after the request may have reached Presto — they are
+retried automatically only when an `httptrace`-proven `RequestNotSent` shows nothing reached the gateway. A
+duplicate `TxnRefNum` on `Init` returns error `1203`; reconcile with `Query` rather than re-calling `Init`:
+
+```go
+res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
+    PrestoMRN: "YOUR_PRESTO_MRN",
+    TxnRefNum: "order-123",
+})
+```
+
+`Query` is read-only and safe to retry; `Config.RetryReads` governs how many times and how it backs off for
+`Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too. See
+[go-plan.md §3.9](../go-plan.md#39-idempotency-and-retries).
 
 ## Webhooks
 
