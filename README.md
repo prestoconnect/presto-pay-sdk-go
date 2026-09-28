@@ -118,6 +118,11 @@ res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
 `Query` is read-only and safe to retry; `Config.RetryReads` governs how many times and how it backs off for
 `Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too.
 
+`Reverse` on a payment that's still `PendingAuthorise` (never paid) cancels it rather than failing — there's
+nothing to reverse financially. `Reverse` is only usable within roughly 15 minutes of the payment being
+requested or authorised; beyond that window it's expected to fail with error `1221`, and `Refund` becomes the
+only way to undo a settled payment. The exact cutoff hasn't been independently confirmed against staging.
+
 If you supply a custom `Config.HTTPClient` or `Transport`, never set an `Idempotency-Key` or
 `X-Idempotency-Key` header: `net/http` treats a POST carrying either as replayable and may silently resend it on
 a broken idle connection, which is exactly the transparent retry this SDK's idempotency guarantees depend on

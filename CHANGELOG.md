@@ -10,6 +10,9 @@ All notable changes to this project are documented in this file.
   another wrong assumption: `Reverse` on a payment that was never paid **succeeds** and cancels it
   (`PaymentStatus` becomes `Cancelled`) rather than failing — there is nothing to reverse financially if nothing
   was ever paid. `Refund` in the same state is correctly rejected with error `1227`.
+- README: `Reverse` is only usable within roughly 15 minutes of a payment being requested or authorised, per
+  additional guidance — beyond that window it's expected to fail with `1221`, and `Refund` becomes the only way
+  to undo a settled payment. Not yet independently confirmed against staging.
 
 ## 0.1.0 - 2026-09-28
 
