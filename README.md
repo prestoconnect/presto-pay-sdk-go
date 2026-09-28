@@ -18,8 +18,6 @@ still move.**
 - [Retries and idempotency](#retries-and-idempotency)
 - [Webhooks](#webhooks)
 - [Errors](#errors)
-- [Custom HTTP client](#custom-http-client)
-- [Debugging signatures](#debugging-signatures)
 - [Samples](#samples)
 
 ## Install
@@ -175,24 +173,6 @@ operation exists.
 
 `RawBody` and `Canonical` can carry PII (`cardBin`, `cardSummary`, `receiptEmail`, `receiptName`); `Error()`
 redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves are always populated regardless.
-
-## Custom HTTP client
-
-Set `Config.HTTPClient` to use your own client (for proxies, pooling, or tracing); the SDK clones it and forces
-`CheckRedirect` to `http.ErrUseLastResponse` regardless, since a redirect with a signed payment body attached
-must never be followed transparently.
-
-```go
-client, err := prestopay.New(prestopay.Config{
-    // ...
-    HTTPClient: &http.Client{Transport: myTransport},
-})
-```
-
-## Debugging signatures
-
-`prestopay.Canonicalize(fields map[string]any)` reproduces the gateway canonical string from a parsed body, to
-compare against a packet capture. Avoid depending on anything under `internal/` — it is not semver-stable.
 
 ## Samples
 
