@@ -30,7 +30,7 @@ go get github.com/prestoconnect/presto-pay-sdk-go
 ```
 
 Pre-1.0, so pin a specific tag rather than tracking the module unpinned, e.g.
-`go get github.com/prestoconnect/presto-pay-sdk-go@v0.1.0`.
+`go get github.com/prestoconnect/presto-pay-sdk-go@v0.2.0`.
 
 ## Quick start
 
@@ -123,12 +123,11 @@ nothing to reverse financially. A `PendingAuthorise` payment expires (`PaymentSt
 minutes after `Init` if not finalised by then — a confirmed business rule, consistent with real staging traffic.
 Once `Expired`, `Reverse` fails with error `1219` rather than cancelling it.
 
-`Reverse` and `Refund` on an **authorised** payment only work for a non-guest user paying via specific payment
-methods (`PaymentMethodWallet`, `PaymentMethodCard` — but not `PaymentMethodPmPgCard`, any `Subwallet_*` method,
-and a subset of loyalty methods): most other payment methods settle through an offline refund process with no
-API the gateway can call on the merchant's behalf. A guest-checkout `AffinBank` payment returned business error
-`1242` ("Unable to refund to a guest account, please contact support") when reversed; the response for a
-non-guest user on an unsupported method hasn't been captured yet.
+You can request a refund for any payment method. Whether it succeeds depends on the payment method and the
+gateway's handling of that payment; some refunds require manual or offline processing. Check the response and
+reconcile the payment before treating a refund as complete. In one observed case, reversing a guest-checkout
+`AffinBank` payment returned business error `1242` ("Unable to refund to a guest account, please contact
+support"). That response does not establish a general restriction on refund requests.
 
 If you supply a custom `Config.HTTPClient` or `Transport`, never set an `Idempotency-Key` or
 `X-Idempotency-Key` header: `net/http` treats a POST carrying either as replayable and may silently resend it on

@@ -181,9 +181,6 @@ const (
 	ErrorCodeRefundAmountExceedsTransaction = "1235"
 	ErrorCodeRefundableAmountExceeded       = "1236"
 
-	// Captured directly from a real staging response rather than the
-	// documented list, which jumps from 1236 to 1400: reversing or
-	// refunding a guest-checkout payment fails with this code.
 	ErrorCodeGuestAccountRefundNotSupported = "1242"
 
 	// User.
