@@ -1,8 +1,9 @@
 # Presto Pay SDK (Go) — net/http demo
 
 A runnable demo of the Go Presto Pay SDK against **Presto's real staging gateway**, using only `net/http`,
-`html/template`, and the SDK itself — no third-party dependencies. Staging credentials are not bundled; provide
-your own key files and merchant identifiers through `.env`.
+`html/template`, and the SDK itself — no third-party Go dependencies (the checkout page loads Tailwind CSS and
+Font Awesome from a CDN for styling, which is a browser asset, not a module import). Staging credentials are not
+bundled; provide your own key files and merchant identifiers through `.env`.
 
 The checkout page models a merchant deciding **where the shopper picks a payment method**: a toggle switches
 between letting Presto's hosted payment page collect it (`AllowedPaymentMethods` omitted) and collecting it on
@@ -25,8 +26,8 @@ deliver webhooks to localhost — see below to fix that.
 
 | Route | SDK feature |
 |-------|-------------|
-| `GET /` | The checkout page. The "Who picks the payment method?" toggle switches the form between the hosted flow and the self-hosted method picker |
-| `POST /checkout` | `client.Payments.Init(...)`, with `AllowedPaymentMethods` set only when the toggle points at this site. From a browser, redirects to the hosted `PaymentURL`; from `curl` (`Content-Type: application/json`), returns the `InitResponse` as JSON, or a 400/502 error body with `mayHaveTakenEffect`/`reconcileBy` |
+| `GET /` | The checkout page. The "Show payment methods on checkout" toggle switches the form between the hosted flow and a self-hosted method picker (client-side, inline in `templates/index.html`) |
+| `POST /checkout` | `client.Payments.Init(...)`, with `AllowedPaymentMethods` set only when the toggle is on. Always JSON in and out — the checkout page submits via `fetch` and redirects the browser to `paymentUrl` itself. Returns the `InitResponse`, or a 400/502 error body with `mayHaveTakenEffect`/`reconcileBy` |
 | `GET /return/{txnRefNum}` | `client.Payments.Query(...)` after the customer comes back from the hosted payment page |
 | `GET /payments/{paymentRefNum}` | `client.Payments.Query(...)` by `paymentRefNum`, for `curl` |
 | `POST /payments/{paymentRefNum}/reverse` | `client.Payments.Reverse(...)` |
@@ -37,7 +38,7 @@ Selecting a payment method on this site is not a replacement payment processor: 
 and SDK request that restricts which method Presto displays. The final authorization still happens on the
 hosted payment page returned by `res.PaymentURL`.
 
-Try the JSON API with `curl`:
+Try the JSON API directly with `curl`:
 
 ```bash
 curl -X POST localhost:8080/checkout -H 'Content-Type: application/json' -d '{"amount":2500,"currencyCode":"MYR"}'

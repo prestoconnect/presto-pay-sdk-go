@@ -2,53 +2,172 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Presto Pay SDK — Go demo</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #222; }
-    label { display: block; margin: 12px 0 4px; font-weight: 600; }
-    input, select { width: 100%; padding: 8px; box-sizing: border-box; font-size: 14px; }
-    button { margin-top: 20px; padding: 10px 20px; font-size: 14px; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    td, th { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; font-size: 13px; }
-    .toggle a { margin-right: 8px; }
-    .toggle strong { text-decoration: underline; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
-<body>
-  <h1>Presto Pay SDK — Go demo</h1>
-  <p>Every submitted payment starts a real call to the configured Presto staging gateway.</p>
+<body class="min-h-screen bg-slate-100 font-sans text-slate-900">
+<div class="mx-auto max-w-md px-4 py-8">
 
-  <p class="toggle">
-    Who picks the payment method?
-    <a href="/?showMethods=0">{{if .ShowMethods}}Presto's hosted page{{else}}<strong>Presto's hosted page</strong>{{end}}</a>
-    <a href="/?showMethods=1">{{if .ShowMethods}}<strong>this site</strong>{{else}}this site{{end}}</a>
-  </p>
+  <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <header class="flex items-center gap-2 bg-slate-900 px-6 py-4 text-lg font-bold text-white">
+      <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+      <span>Presto Pay SDK — Go demo</span>
+    </header>
 
-  <form method="post" action="/checkout">
-    <label for="amount">Amount (minor units)</label>
-    <input type="number" id="amount" name="amount" value="1000" required>
+    <div class="p-6">
+      <div id="checkoutAlert" class="mb-5 hidden rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+        <strong>Could not start payment</strong>
+        <p id="checkoutAlertMessage" class="mt-1 text-sm"></p>
+      </div>
 
-    <label for="currencyCode">Currency</label>
-    <input type="text" id="currencyCode" name="currencyCode" value="MYR" required>
+      <form id="checkoutForm">
+        <label class="mb-5 flex cursor-pointer items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <span>
+            <strong class="block text-sm text-slate-900">Show payment methods on checkout</strong>
+            <span class="mt-0.5 block text-xs text-amber-800" id="toggleDesc">
+              Off: shopper selects after redirect, on Presto's hosted page
+            </span>
+          </span>
+          <span class="relative inline-flex h-6 w-11 shrink-0 items-center">
+            <input type="checkbox" id="showMethods" class="peer sr-only">
+            <span class="absolute inset-0 rounded-full bg-slate-300 transition-colors peer-checked:bg-indigo-600"></span>
+            <span class="relative h-5 w-5 translate-x-0.5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"
+                  aria-hidden="true"></span>
+          </span>
+        </label>
 
-    {{if .ShowMethods}}
-    <label for="paymentMethod">Payment method</label>
-    <select id="paymentMethod" name="paymentMethod">
-      {{range .PaymentMethods}}<option value="{{.}}">{{.}}</option>{{end}}
-    </select>
-    {{end}}
+        <h1 class="text-xl font-bold">Checkout</h1>
+        <p class="mb-4 text-sm text-slate-500" id="checkoutHint">
+          Enter the amount and currency. You will choose how to pay on the next page.
+        </p>
 
-    <button type="submit">Pay</button>
-  </form>
+        <div class="mb-4 grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="amount" class="mb-1 block text-xs font-medium text-slate-500">Amount (minor units)</label>
+            <input id="amount" type="number" min="1" value="1000"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500">
+          </div>
+          <div>
+            <label for="currencyCode" class="mb-1 block text-xs font-medium text-slate-500">Currency</label>
+            <input id="currencyCode" type="text" value="MYR" maxlength="3"
+                   class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div id="methodSection" class="mt-5 hidden border-t border-slate-200 pt-5">
+          <fieldset class="mb-4">
+            <legend class="mb-3 text-sm font-semibold">Choose payment method</legend>
+            <div class="flex flex-col gap-2.5">
+              {{range .PaymentMethods}}
+              <label class="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-300 bg-white p-3 transition-colors hover:border-slate-400 has-[input:checked]:border-indigo-600 has-[input:checked]:bg-indigo-50 has-[input:checked]:ring-1 has-[input:checked]:ring-indigo-600">
+                <input type="radio" name="paymentMethod" value="{{.Code}}" class="order-2 ml-auto h-[18px] w-[18px] shrink-0 accent-indigo-600">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-100 text-slate-600">
+                  <i class="fa-solid {{.Icon}}" aria-hidden="true"></i>
+                </span>
+                <span class="min-w-0 flex-1 text-sm font-semibold">{{.Name}}</span>
+              </label>
+              {{end}}
+            </div>
+          </fieldset>
+        </div>
+
+        <button type="submit" id="submitButton"
+                class="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-60">
+          <i class="fa-solid fa-lock" aria-hidden="true"></i>
+          <span>Pay</span>
+        </button>
+        <p class="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-slate-500">
+          <i class="fa-solid fa-lock" aria-hidden="true"></i>
+          <span>Every submitted payment starts a real call to the configured Presto staging gateway.</span>
+        </p>
+      </form>
+    </div>
+  </section>
 
   {{if .Events}}
-  <h2>Recent webhooks</h2>
-  <table>
-    <tr><th>Received</th><th>Event</th><th>Payment ref</th><th>Status</th></tr>
-    {{range .Events}}
-    <tr><td>{{.ReceivedAt}}</td><td>{{.EventCode}}</td><td>{{.PaymentRefNum}}</td><td>{{.PaymentStatus}}</td></tr>
-    {{end}}
-  </table>
+  <section class="mt-6">
+    <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Recent webhooks</h3>
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <table class="w-full text-xs">
+        <thead>
+        <tr class="bg-slate-50 text-slate-500">
+          <th class="px-3 py-2 text-left font-medium">Received</th>
+          <th class="px-3 py-2 text-left font-medium">Event</th>
+          <th class="px-3 py-2 text-left font-medium">Payment ref</th>
+          <th class="px-3 py-2 text-left font-medium">Status</th>
+        </tr>
+        </thead>
+        <tbody>
+        {{range .Events}}
+        <tr class="border-t border-slate-200">
+          <td class="px-3 py-2">{{.ReceivedAt}}</td>
+          <td class="px-3 py-2">{{.EventCode}}</td>
+          <td class="px-3 py-2">{{.PaymentRefNum}}</td>
+          <td class="px-3 py-2{{if eq .EventCode "Authorised"}} font-semibold text-green-600{{end}}">{{.PaymentStatus}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+  </section>
   {{end}}
+</div>
+
+<script>
+  const toggle = document.getElementById('showMethods');
+  const methodSection = document.getElementById('methodSection');
+  const toggleDesc = document.getElementById('toggleDesc');
+  const checkoutHint = document.getElementById('checkoutHint');
+
+  toggle.addEventListener('change', () => {
+    const on = toggle.checked;
+    methodSection.classList.toggle('hidden', !on);
+    toggleDesc.textContent = on
+      ? "On: shopper selects here, before paying"
+      : "Off: shopper selects after redirect, on Presto's hosted page";
+    checkoutHint.textContent = on
+      ? 'Enter the amount and currency, then choose how you want to pay.'
+      : 'Enter the amount and currency. You will choose how to pay on the next page.';
+  });
+
+  const form = document.getElementById('checkoutForm');
+  const alertBox = document.getElementById('checkoutAlert');
+  const alertMessage = document.getElementById('checkoutAlertMessage');
+  const submitButton = document.getElementById('submitButton');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    alertBox.classList.add('hidden');
+    submitButton.disabled = true;
+
+    const selectedMethod = form.querySelector('input[name="paymentMethod"]:checked');
+    const payload = {
+      amount: Number(document.getElementById('amount').value),
+      currencyCode: document.getElementById('currencyCode').value,
+    };
+    if (toggle.checked && selectedMethod) {
+      payload.paymentMethod = selectedMethod.value;
+    }
+
+    try {
+      const res = await fetch('/checkout', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || 'Could not start payment.');
+      }
+      window.location.href = body.paymentUrl;
+    } catch (err) {
+      alertMessage.textContent = err.message;
+      alertBox.classList.remove('hidden');
+      submitButton.disabled = false;
+    }
+  });
+</script>
 </body>
 </html>

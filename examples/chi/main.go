@@ -13,7 +13,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -29,12 +28,18 @@ var templateFS embed.FS
 
 var templates = template.Must(template.ParseFS(templateFS, "templates/*.html"))
 
-var paymentMethodChoices = []string{
-	prestopay.PaymentMethodWallet,
-	prestopay.PaymentMethodCard,
-	prestopay.PaymentMethodTouchNGoEWallet,
-	prestopay.PaymentMethodGrabPay,
-	prestopay.PaymentMethodBoost,
+type paymentMethodOption struct {
+	Code string
+	Name string
+	Icon string
+}
+
+var paymentMethodChoices = []paymentMethodOption{
+	{Code: prestopay.PaymentMethodCard, Name: "Credit / debit card", Icon: "fa-credit-card"},
+	{Code: prestopay.PaymentMethodTouchNGoEWallet, Name: "Touch 'n Go eWallet", Icon: "fa-wallet"},
+	{Code: prestopay.PaymentMethodGrabPay, Name: "GrabPay", Icon: "fa-wallet"},
+	{Code: prestopay.PaymentMethodMaybank, Name: "Maybank FPX", Icon: "fa-building-columns"},
+	{Code: prestopay.PaymentMethodCimb, Name: "CIMB Clicks", Icon: "fa-building-columns"},
 }
 
 func main() {
@@ -95,11 +100,9 @@ func main() {
 func handleHome(st *store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data := struct {
-			ShowMethods    bool
-			PaymentMethods []string
+			PaymentMethods []paymentMethodOption
 			Events         []recentEvent
 		}{
-			ShowMethods:    r.URL.Query().Get("showMethods") == "1",
 			PaymentMethods: paymentMethodChoices,
 			Events:         st.recentEvents(),
 		}
@@ -109,70 +112,71 @@ func handleHome(st *store) http.HandlerFunc {
 	}
 }
 
-// handleCheckout serves both the browser form (redirects to the hosted
-// payment page on success) and a JSON API for curl, distinguished by
-// Content-Type.
+// handleCheckout always speaks JSON: the checkout page's own script submits
+// it via fetch and does the redirect to PaymentURL itself, and curl gets the
+// same response.
 func handleCheckout(client *prestopay.Client, prestoMRN, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		isJSON := strings.Contains(r.Header.Get("Content-Type"), "application/json")
-
-		var (
-			txnRefNum    string
-			amount       int64
-			currencyCode string
-			methods      []string
-		)
-		if isJSON {
-			var input struct {
-				TxnRefNum    string `json:"txnRefNum"`
-				Amount       int64  `json:"amount"`
-				CurrencyCode string `json:"currencyCode"`
-			}
-			_ = json.NewDecoder(r.Body).Decode(&input)
-			txnRefNum, amount, currencyCode = input.TxnRefNum, input.Amount, input.CurrencyCode
-		} else {
-			_ = r.ParseForm()
-			amount, _ = strconv.ParseInt(r.FormValue("amount"), 10, 64)
-			currencyCode = r.FormValue("currencyCode")
-			if method := r.FormValue("paymentMethod"); method != "" {
-				methods = []string{method}
-			}
+		var input struct {
+			TxnRefNum     string `json:"txnRefNum"`
+			Amount        int64  `json:"amount"`
+			CurrencyCode  string `json:"currencyCode"`
+			PaymentMethod string `json:"paymentMethod"`
 		}
-		if txnRefNum == "" {
-			txnRefNum = fmt.Sprintf("order-%d", time.Now().UnixNano())
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid request body"})
+			return
 		}
-		if currencyCode == "" {
-			currencyCode = "MYR"
+		if input.TxnRefNum == "" {
+			input.TxnRefNum = fmt.Sprintf("order-%d", time.Now().UnixNano())
 		}
-		if amount == 0 {
-			amount = 1000
+		if input.CurrencyCode == "" {
+			input.CurrencyCode = "MYR"
+		}
+		if input.Amount <= 0 {
+			input.Amount = 1000
+		}
+		var methods []string
+		if input.PaymentMethod != "" {
+			methods = []string{input.PaymentMethod}
 		}
 
 		res, err := client.Payments.Init(r.Context(), prestopay.InitRequest{
 			PrestoMRN:             prestoMRN,
 			TxnType:               prestopay.TxnTypeWebPay,
-			TxnRefNum:             txnRefNum,
-			DisplayDesc:           "Go SDK chi demo order " + txnRefNum,
-			Amount:                amount,
-			CurrencyCode:          currencyCode,
+			TxnRefNum:             input.TxnRefNum,
+			DisplayDesc:           "Go SDK chi demo order " + input.TxnRefNum,
+			Amount:                input.Amount,
+			CurrencyCode:          input.CurrencyCode,
 			NotifyURL:             baseURL + "/presto/notify",
-			RedirectURL:           baseURL + "/return/" + txnRefNum,
+			RedirectURL:           baseURL + "/return/" + input.TxnRefNum,
 			AllowedPaymentMethods: methods,
 		})
 		if err != nil {
-			if isJSON {
-				writePrestoError(w, err)
-				return
-			}
-			http.Error(w, err.Error(), http.StatusBadGateway)
+			writePrestoError(w, err)
 			return
 		}
+		writeJSON(w, http.StatusOK, res)
+	}
+}
 
-		if isJSON {
-			writeJSON(w, http.StatusOK, res)
-			return
-		}
-		http.Redirect(w, r, res.PaymentURL, http.StatusSeeOther)
+// returnStatus maps a payment status to how the return page presents it.
+type returnStatus struct {
+	Heading   string
+	IconClass string
+	IconBg    string
+}
+
+func classifyPaymentStatus(status string) returnStatus {
+	switch status {
+	case prestopay.PaymentStatusAuthorised, prestopay.PaymentStatusRefunded:
+		return returnStatus{"Payment Successful", "fa-solid fa-check", "bg-green-600"}
+	case prestopay.PaymentStatusPendingAuthorise, prestopay.PaymentStatusPendingReverse, prestopay.PaymentStatusPendingRefund:
+		return returnStatus{"Payment Pending", "fa-solid fa-clock", "bg-amber-500"}
+	case prestopay.PaymentStatusFailed, prestopay.PaymentStatusCancelled, prestopay.PaymentStatusExpired:
+		return returnStatus{"Payment Failed", "fa-solid fa-xmark", "bg-red-600"}
+	default:
+		return returnStatus{"Payment " + status, "fa-solid fa-circle-info", "bg-slate-500"}
 	}
 }
 
@@ -185,20 +189,28 @@ func handleReturn(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
 		})
 
 		data := struct {
-			Error         string
-			TxnRefNum     string
-			PaymentRefNum string
-			PaymentStatus string
-			Amount        int64
-			CurrencyCode  string
+			Error           string
+			TxnRefNum       string
+			PaymentRefNum   string
+			PaymentStatus   string
+			FormattedAmount string
+			CurrencyCode    string
+			Heading         string
+			IconClass       string
+			IconBg          string
 		}{TxnRefNum: txnRefNum}
+
 		if err != nil {
 			data.Error = err.Error()
 		} else {
+			status := classifyPaymentStatus(res.PaymentStatus)
 			data.PaymentRefNum = res.PaymentRefNum
 			data.PaymentStatus = res.PaymentStatus
-			data.Amount = res.Amount
+			data.FormattedAmount = fmt.Sprintf("%.2f", float64(res.Amount)/100)
 			data.CurrencyCode = res.CurrencyCode
+			data.Heading = status.Heading
+			data.IconClass = status.IconClass
+			data.IconBg = status.IconBg
 		}
 		if err := templates.ExecuteTemplate(w, "return.html", data); err != nil {
 			log.Printf("rendering return.html: %v", err)
@@ -311,7 +323,7 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// recentEvent is a webhook delivery shown on the checkout and return pages.
+// recentEvent is a webhook delivery shown on the checkout page.
 type recentEvent struct {
 	ReceivedAt    string
 	EventCode     string
