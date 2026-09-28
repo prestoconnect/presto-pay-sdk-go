@@ -9,14 +9,6 @@ still move.**
 - **Zero dependencies** — stdlib only
 - **Thread-safe** `Client` — build once, share across goroutines, like `*sql.DB`
 
-## Status
-
-Client construction and key validation, the error types, key loading, canonicalization, timestamp formatting,
-the four payment operations (`Init`, `Query`, `Reverse`, `Refund`) with validation, response mapping, and the
-`Raw` escape hatch, webhook verification, `ConfigFromEnv`, and a staging smoke test verified against the real
-gateway are all implemented and tested today. See [CHANGELOG.md](CHANGELOG.md) for details. Remaining work —
-vendoring the shared wire-contract test vectors and tagging a first release — is still open.
-
 ## Contents
 
 - [Install](#install)
@@ -29,7 +21,6 @@ vendoring the shared wire-contract test vectors and tagging a first release — 
 - [Custom HTTP client](#custom-http-client)
 - [Debugging signatures](#debugging-signatures)
 - [Samples](#samples)
-- [Staging smoke test](#staging-smoke-test)
 
 ## Install
 
@@ -215,19 +206,3 @@ compare against a packet capture. Avoid depending on anything under `internal/` 
 
 `examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies and a `replace`
 directive pointing at the local SDK source — the SDK module itself stays dependency-free.
-
-## Staging smoke test
-
-`prestopay/staging_test.go` calls Presto's real staging gateway: `Init`, an immediate `Query` on the same
-transaction, and a duplicate `Init` confirming Presto's own idempotent-by-`TxnRefNum` behavior (returns the
-existing payment's current status, same `PaymentRefNum`, rather than creating a second record). It is excluded
-from the normal build entirely (a `staging` build tag) and, even when built with that tag, still requires an
-explicit opt-in, since it creates a real payment record on every run:
-
-```bash
-PRESTOPAY_STAGING_SMOKE=1 go test -tags staging ./prestopay/... -run TestStagingSmoke -v
-```
-
-Configure real staging credentials the same way as [Configuration from environment](#configuration-from-environment),
-plus `PRESTO_MRN`. Without `PRESTOPAY_STAGING_SMOKE=1` the test skips even under `-tags staging`, and without the
-tag at all `go test ./...` never compiles it.
