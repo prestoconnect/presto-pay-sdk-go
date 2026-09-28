@@ -18,9 +18,9 @@ func FormatTimestamp(t time.Time) string {
 }
 
 // ParseTimestamp reads a gateway timestamp, returning a time.Time in the
-// fixed +08:00 zone. It is the supported way to read a §3.8 date field,
-// since only some of them are confirmed and an unparseable date should not
-// fail an otherwise authentic response.
+// fixed +08:00 zone. It is the supported way to read a date field, since
+// only some of them are confirmed and an unparseable date should not fail
+// an otherwise authentic response.
 func ParseTimestamp(s string) (time.Time, error) {
 	return time.ParseInLocation(timestampLayout, s, utc8)
 }

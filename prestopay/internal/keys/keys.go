@@ -27,7 +27,7 @@ var (
 const minRSABits = 2048
 
 // LoadPrivateKey parses a PKCS#8 PEM-encoded RSA private key, as delivered
-// after converting the onboarding PKCS#12 keystore (go-plan.md §8).
+// after converting the onboarding PKCS#12 keystore.
 func LoadPrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {

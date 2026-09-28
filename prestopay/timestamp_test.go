@@ -6,7 +6,6 @@ import (
 )
 
 func TestFormatTimestamp_WorkedExample(t *testing.T) {
-	// go-plan.md §3.4's worked example: "ts":"20250423104500.000".
 	tm := time.Date(2025, 4, 23, 10, 45, 0, 0, utc8)
 	if got, want := FormatTimestamp(tm), "20250423104500.000"; got != want {
 		t.Fatalf("FormatTimestamp() = %q, want %q", got, want)

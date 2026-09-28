@@ -24,7 +24,7 @@ const MaxResponseBytes = 1 << 20 // 1 MiB
 
 // Error wraps a failed attempt with whether any byte of the request reached
 // the socket, as observed by httptrace rather than inferred from the error
-// value (go-plan.md §6).
+// value.
 type Error struct {
 	Err            error
 	RequestNotSent bool
@@ -62,9 +62,9 @@ func Attempt(ctx context.Context, client *http.Client, method, url string, body 
 // Classify reports whether err looks, from its own type, like a failure
 // that happens before any bytes are written — DNS failure, dial failure, or
 // a TLS/certificate failure. It exists as a cross-check against the
-// httptrace-derived signal in Attempt: go-plan.md §6 requires the two to
-// agree in tests, since a context.DeadlineExceeded during dial and one
-// while waiting for response headers are indistinguishable as errors alone.
+// httptrace-derived signal in Attempt: the two must agree, since a
+// context.DeadlineExceeded during dial and one while waiting for response
+// headers are indistinguishable as errors alone.
 func Classify(err error) (beforeAnyWrite bool) {
 	if err == nil {
 		return false
@@ -100,9 +100,9 @@ func Classify(err error) (beforeAnyWrite bool) {
 // RetryTransportIfSent and RetryServerErrors are false for Init, Reverse,
 // and Refund: a write is retried only when RequestNotSent proves nothing
 // reached the gateway, never merely because the response was slow or a
-// 500 came back, since either could mean the operation already happened
-// (go-plan.md §3.9). Query sets both true: it is read-only and safe to
-// resend regardless of what came back (go-plan.md §3.6).
+// 500 came back, since either could mean the operation already happened.
+// Query sets both true: it is read-only and safe to resend regardless of
+// what came back.
 type RetryPolicy struct {
 	MaxRetries           int
 	InitialBackoff       time.Duration
@@ -155,9 +155,8 @@ func Send(ctx context.Context, client *http.Client, method, url string, body []b
 	}
 }
 
-// waitBackoff sleeps for the retry delay, racing it against ctx as required
-// by go-plan.md §6, and reports whether the wait completed (false means the
-// deadline ran out first).
+// waitBackoff sleeps for the retry delay, racing it against ctx, and reports
+// whether the wait completed (false means the deadline ran out first).
 func waitBackoff(ctx context.Context, policy RetryPolicy, attempt int, retryAfter string) bool {
 	delay := backoffDelay(policy, attempt)
 	if ra := parseRetryAfter(retryAfter); ra > 0 {

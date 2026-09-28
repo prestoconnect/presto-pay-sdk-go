@@ -24,18 +24,17 @@ const (
 	defaultDeadline = 30 * time.Second
 )
 
-// RetryReads configures retries for Query, the one operation safe to resend
-// (go-plan.md §3.9). Init, Reverse, and Refund are never retried by this
-// policy — they are retried only when an httptrace-proven RequestNotSent
-// shows nothing reached the gateway, which needs no configuration.
+// RetryReads configures retries for Query, the one operation safe to resend.
+// Init, Reverse, and Refund are never retried by this policy — they are
+// retried only when an httptrace-proven RequestNotSent shows nothing reached
+// the gateway, which needs no configuration.
 type RetryReads struct {
 	MaxRetries     int
 	InitialBackoff time.Duration
 	MaxBackoff     time.Duration
 }
 
-// Config configures a Client. See go-plan.md §4 for the field-by-field
-// rationale.
+// Config configures a Client.
 type Config struct {
 	// Environment picks a preset base URL; BaseURL, if set, overrides it.
 	Environment Environment
@@ -53,10 +52,10 @@ type Config struct {
 	RetryReads RetryReads
 
 	// Strict rejects a response that violates a rule the gateway has
-	// confirmed but this SDK otherwise tolerates (go-plan.md §3.6 step 5,
-	// §3.8 length limits). Use it in staging to catch contract drift; leave
-	// it false in production, where rejecting an authentic response after
-	// the operation already took effect helps nobody.
+	// confirmed but this SDK otherwise tolerates. Use it in staging to catch
+	// contract drift; leave it false in production, where rejecting an
+	// authentic response after the operation already took effect helps
+	// nobody.
 	Strict bool
 
 	// ShowErrorBodies includes RawBody and Canonical in Error() strings.
@@ -67,7 +66,7 @@ type Config struct {
 	ShowErrorBodies bool
 
 	// HTTPClient is used as the base client if set; CheckRedirect is
-	// overridden regardless (go-plan.md §6).
+	// overridden regardless.
 	HTTPClient *http.Client
 
 	// Now overrides the clock used for request timestamps; nil means
@@ -138,8 +137,8 @@ func New(cfg Config) (*Client, error) {
 		clone := *httpClient
 		httpClient = &clone
 	}
-	// A 3xx with a signed payment body attached is an HTTP error (§3.6 step
-	// 1), never something to follow transparently.
+	// A 3xx with a signed payment body attached is an HTTP error, never
+	// something to follow transparently.
 	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
@@ -161,8 +160,8 @@ func New(cfg Config) (*Client, error) {
 	return c, nil
 }
 
-// withDeadline bounds ctx to the whole-call budget (go-plan.md §6). The
-// returned cancel func must be called once the call completes.
+// withDeadline bounds ctx to the whole-call budget. The returned cancel func
+// must be called once the call completes.
 func (c *Client) withDeadline(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeout(ctx, c.deadline)
 }

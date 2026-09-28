@@ -19,8 +19,7 @@ var (
 )
 
 // LoadPrivateKey parses a PKCS#8 PEM-encoded RSA private key, as delivered
-// after converting the onboarding PKCS#12 keystore (see the README for the
-// openssl command).
+// after converting the onboarding PKCS#12 keystore.
 func LoadPrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 	return keys.LoadPrivateKey(pemBytes)
 }

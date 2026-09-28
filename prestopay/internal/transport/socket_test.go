@@ -10,12 +10,11 @@ import (
 	"time"
 )
 
-// This file is the socket suite go-plan.md §6 calls for: real sockets
-// driving each way a request can fail, proving that the httptrace-derived
-// RequestNotSent signal agrees with Classify's error-type inspection. A
-// stdlib change that reorders when WroteHeaderField/WroteRequest fire would
-// fail these tests instead of silently changing retry and idempotency
-// behavior.
+// This file drives real sockets through each way a request can fail,
+// proving that the httptrace-derived RequestNotSent signal agrees with
+// Classify's error-type inspection. A stdlib change that reorders when
+// WroteHeaderField/WroteRequest fire would fail these tests instead of
+// silently changing retry and idempotency behavior.
 
 func attemptWithTimeout(t *testing.T, url string, timeout time.Duration) (bool, error) {
 	t.Helper()

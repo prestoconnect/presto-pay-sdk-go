@@ -97,18 +97,17 @@ type TransportError struct {
 	Err error
 
 	// RequestNotSent is true only when an httptrace.ClientTrace proved that
-	// no byte of the request reached the socket — see go-plan.md §6. It is
-	// never inferred from the error's type alone.
+	// no byte of the request reached the socket. It is never inferred from
+	// the error's type alone.
 	RequestNotSent bool
 
 	tookEffect bool
 	reconcile  *ReconcileKey
 }
 
-// newTransportError decides MayHaveTakenEffect at construction, per
-// go-plan.md §4: only here is it known which operation ran. Query is safe to
-// resend regardless of RequestNotSent (go-plan.md §3.9), so it never counts
-// as ambiguous.
+// newTransportError decides MayHaveTakenEffect at construction: only here is
+// it known which operation ran. Query is safe to resend regardless of
+// RequestNotSent, so it never counts as ambiguous.
 func newTransportError(op Operation, err error, requestNotSent bool, reconcile *ReconcileKey) *TransportError {
 	e := &TransportError{Op: op, Err: err, RequestNotSent: requestNotSent}
 	if ambiguousWrite(op) && !requestNotSent {
@@ -144,11 +143,11 @@ type APIError struct {
 
 	// Canonical is set when ErrorCode is 1006 or 1007: the gateway does not
 	// distinguish a malformed signature from a well-formed one that failed
-	// to verify, so both get this field for debugging (go-plan.md §3.6).
+	// to verify, so both get this field for debugging.
 	Canonical string
 
 	// ClockOffset is the observed difference between this host's ts and the
-	// gateway's, set when ErrorCode is 1005 (go-plan.md §3.3).
+	// gateway's, set when ErrorCode is 1005.
 	ClockOffset    time.Duration
 	HasClockOffset bool
 
@@ -252,10 +251,10 @@ func (e *ResponseError) ReconcileBy() (ReconcileKey, bool) {
 	return *e.reconcile, true
 }
 
-// newAPIError decides MayHaveTakenEffect at construction (go-plan.md §4): a
-// KindHTTP status of 500 or above is ambiguous for a write operation
-// (go-plan.md §3.6); a KindBusiness error is ambiguous only for code 1203,
-// which means a payment record already exists (go-plan.md §3.9).
+// newAPIError decides MayHaveTakenEffect at construction: a KindHTTP status
+// of 500 or above is ambiguous for a write operation; a KindBusiness error
+// is ambiguous only for code 1203, which means a payment record already
+// exists.
 func newAPIError(op Operation, kind Kind, httpStatus int, code, message string, raw []byte, canonical string, showBody bool, reconcile *ReconcileKey) *APIError {
 	e := &APIError{
 		Op: op, Kind: kind, HTTPStatus: httpStatus, ErrorCode: code, ErrorMessage: message,
@@ -280,9 +279,9 @@ func (e *APIError) withClockOffset(d time.Duration) *APIError {
 }
 
 // newSignatureError decides MayHaveTakenEffect at construction: a response
-// signature failure is ambiguous for a write operation (go-plan.md §3.6,
-// step 3), but a webhook signature failure is not — it reports on an event
-// that already happened rather than on a request this SDK made.
+// signature failure is ambiguous for a write operation, but a webhook
+// signature failure is not — it reports on an event that already happened
+// rather than on a request this SDK made.
 func newSignatureError(op Operation, source, canonical string, showBody bool) *SignatureError {
 	return &SignatureError{
 		Op: op, Source: source, Canonical: canonical, showBody: showBody,

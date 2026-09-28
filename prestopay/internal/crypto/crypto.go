@@ -13,8 +13,7 @@ import (
 
 // ErrInvalidSignature covers both a signature that is not valid Base64 and
 // one that is well-formed but does not verify: the gateway's own error codes
-// do not distinguish the two (go-plan.md §3.6, codes 1006/1007), so neither
-// does this package.
+// (1006/1007) do not distinguish the two, so neither does this package.
 var ErrInvalidSignature = errors.New("prestopay: signature invalid")
 
 // Sign returns the standard-Base64 signature over the UTF-8 bytes of
