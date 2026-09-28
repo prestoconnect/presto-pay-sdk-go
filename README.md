@@ -3,8 +3,7 @@
 [![CI](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-Standalone, framework-agnostic Go library for the **Presto Connect** payment gateway. **Pre-1.0 — the API can
-still move.**
+Standalone, framework-agnostic Go library for the **Presto Connect** payment gateway.
 
 - **Go 1.24+** (1.24, 1.25, 1.26 in CI) — no build tags, no cgo
 - **Zero dependencies** — stdlib only
@@ -29,7 +28,7 @@ still move.**
 go get github.com/prestoconnect/presto-pay-sdk-go
 ```
 
-Pre-1.0, so pin a specific tag rather than tracking the module unpinned, e.g.
+Pin a specific release tag for reproducible builds, e.g.
 `go get github.com/prestoconnect/presto-pay-sdk-go@v0.2.0`.
 
 ## Quick start
