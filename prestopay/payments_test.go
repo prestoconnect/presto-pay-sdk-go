@@ -141,6 +141,24 @@ func TestPayments_Init_Success(t *testing.T) {
 	if res.Amount != 10_000 {
 		t.Fatalf("Amount = %d, want 10000", res.Amount)
 	}
+
+	// Response types are handed to callers as Go structs, but a caller that
+	// re-marshals one (e.g. to return it as a JSON API response) must get
+	// wire-style camelCase keys back, not Go field names.
+	marshaled, err := json.Marshal(res)
+	if err != nil {
+		t.Fatalf("json.Marshal(res): %v", err)
+	}
+	var reencoded map[string]any
+	if err := json.Unmarshal(marshaled, &reencoded); err != nil {
+		t.Fatalf("json.Unmarshal: %v", err)
+	}
+	if _, ok := reencoded["paymentUrl"]; !ok {
+		t.Fatalf("marshaled InitResponse is missing \"paymentUrl\"; got keys %v", marshaled)
+	}
+	if _, ok := reencoded["PaymentURL"]; ok {
+		t.Fatal("marshaled InitResponse should not use the Go field name \"PaymentURL\" as a JSON key")
+	}
 }
 
 func TestPayments_Init_ValidationErrors(t *testing.T) {

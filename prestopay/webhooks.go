@@ -20,26 +20,26 @@ const (
 
 // NotifyEvent is a verified webhook event.
 type NotifyEvent struct {
-	MID            string
-	EventCode      string
-	PrestoMRN      string
-	PaymentRefNum  string
-	TxnRefNum      string
-	EventRefNum    string
-	EventTs        string
-	Amount         int64
-	CurrencyCode   string
-	Ts             string
-	Success        bool
-	UserRefNum     string
-	AdditionalData string
-	PaymentDetails []PaymentDetail
+	MID            string          `json:"mid"`
+	EventCode      string          `json:"eventCode"`
+	PrestoMRN      string          `json:"prestoMrn"`
+	PaymentRefNum  string          `json:"paymentRefNum"`
+	TxnRefNum      string          `json:"txnRefNum"`
+	EventRefNum    string          `json:"eventRefNum"`
+	EventTs        string          `json:"eventTs"`
+	Amount         int64           `json:"amount"`
+	CurrencyCode   string          `json:"currencyCode"`
+	Ts             string          `json:"ts"`
+	Success        bool            `json:"success"`
+	UserRefNum     string          `json:"userRefNum,omitempty"`
+	AdditionalData string          `json:"additionalData,omitempty"`
+	PaymentDetails []PaymentDetail `json:"paymentDetails,omitempty"`
 
 	// PaymentStatus is derived: for EventCodeAuthorised it reflects Success
 	// (PaymentStatusAuthorised or PaymentStatusFailed); for every other event
 	// code it is the event code itself. Query remains the authoritative
 	// source of payment state.
-	PaymentStatus string
+	PaymentStatus string `json:"paymentStatus"`
 }
 
 // WebhookConfig configures a WebhookVerifier.

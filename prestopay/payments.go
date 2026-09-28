@@ -66,121 +66,121 @@ type PaymentDetail struct {
 // is required when Amount is set; RedirectURL is required when TxnType is
 // TxnTypeWebPay.
 type InitRequest struct {
-	PrestoMRN             string
-	TxnType               string
-	TxnRefNum             string
-	DisplayDesc           string
-	QRValue               string
-	PayerRefNum           string
-	DeviceRefNum          string
-	DeviceIP              string
-	ItemList              []LineItem
-	TransactionalData     string
-	Amount                int64
-	CurrencyCode          string
-	NotifyURL             string
-	RedirectURL           string
-	SessionValidity       string
-	AdditionalData        string
-	Mode                  string
-	ModeData              string
-	AllowedPaymentMethods []string
-	BindData              string
-	ThemeRefNum           string
-	ReceiptEmail          string
-	ReceiptName           string
+	PrestoMRN             string     `json:"prestoMrn"`
+	TxnType               string     `json:"txnType"`
+	TxnRefNum             string     `json:"txnRefNum"`
+	DisplayDesc           string     `json:"displayDesc"`
+	QRValue               string     `json:"qrValue,omitempty"`
+	PayerRefNum           string     `json:"payerRefNum,omitempty"`
+	DeviceRefNum          string     `json:"deviceRefNum,omitempty"`
+	DeviceIP              string     `json:"deviceIp,omitempty"`
+	ItemList              []LineItem `json:"itemList,omitempty"`
+	TransactionalData     string     `json:"transactionalData,omitempty"`
+	Amount                int64      `json:"amount,omitempty"`
+	CurrencyCode          string     `json:"currencyCode,omitempty"`
+	NotifyURL             string     `json:"notifyUrl,omitempty"`
+	RedirectURL           string     `json:"redirectUrl,omitempty"`
+	SessionValidity       string     `json:"sessionValidity,omitempty"`
+	AdditionalData        string     `json:"additionalData,omitempty"`
+	Mode                  string     `json:"mode,omitempty"`
+	ModeData              string     `json:"modeData,omitempty"`
+	AllowedPaymentMethods []string   `json:"allowedPaymentMethods,omitempty"`
+	BindData              string     `json:"bindData,omitempty"`
+	ThemeRefNum           string     `json:"themeRefNum,omitempty"`
+	ReceiptEmail          string     `json:"receiptEmail,omitempty"`
+	ReceiptName           string     `json:"receiptName,omitempty"`
 }
 
 // InitResponse is the result of a successful Init.
 type InitResponse struct {
-	PrestoMRN            string
-	PaymentRefNum        string
-	PaymentStatus        string
-	TxnRefNum            string
-	PaymentURL           string
-	UserRefNum           string
-	Amount               int64
-	CurrencyCode         string
-	PaymentRequestDate   string
-	PaymentFinalisedDate string
-	AdditionalData       string
+	PrestoMRN            string `json:"prestoMrn"`
+	PaymentRefNum        string `json:"paymentRefNum"`
+	PaymentStatus        string `json:"paymentStatus"`
+	TxnRefNum            string `json:"txnRefNum"`
+	PaymentURL           string `json:"paymentUrl"`
+	UserRefNum           string `json:"userRefNum,omitempty"`
+	Amount               int64  `json:"amount"`
+	CurrencyCode         string `json:"currencyCode,omitempty"`
+	PaymentRequestDate   string `json:"paymentRequestDate,omitempty"`
+	PaymentFinalisedDate string `json:"paymentFinalisedDate,omitempty"`
+	AdditionalData       string `json:"additionalData,omitempty"`
 }
 
 // QueryRequest looks up a payment by PaymentRefNum or TxnRefNum (at least
 // one is required), under PrestoMRN.
 type QueryRequest struct {
-	PrestoMRN     string
-	PaymentRefNum string
-	TxnRefNum     string
+	PrestoMRN     string `json:"prestoMrn"`
+	PaymentRefNum string `json:"paymentRefNum,omitempty"`
+	TxnRefNum     string `json:"txnRefNum,omitempty"`
 }
 
 // QueryResponse is the result of a successful Query.
 type QueryResponse struct {
-	PrestoMRN            string
-	PaymentRefNum        string
-	TxnRefNum            string
-	UserRefNum           string
-	PaymentStatus        string
-	Amount               int64
-	CurrencyCode         string
-	PaymentRequestDate   string
-	PaymentFinalisedDate string
-	ReversalRefNum       string
-	PrestoReversalRefNum string
-	ReversalStatus       string
-	ReversalDate         string
-	RefundRefNum         string
-	PrestoRefundRefNum   string
-	RefundStatus         string
-	RefundRequestDate    string
-	RefundFinalisedDate  string
-	AdditionalData       string
-	RefundDetails        []RefundDetail
-	PaymentDetails       []PaymentDetail
+	PrestoMRN            string          `json:"prestoMrn"`
+	PaymentRefNum        string          `json:"paymentRefNum"`
+	TxnRefNum            string          `json:"txnRefNum,omitempty"`
+	UserRefNum           string          `json:"userRefNum,omitempty"`
+	PaymentStatus        string          `json:"paymentStatus,omitempty"`
+	Amount               int64           `json:"amount"`
+	CurrencyCode         string          `json:"currencyCode,omitempty"`
+	PaymentRequestDate   string          `json:"paymentRequestDate,omitempty"`
+	PaymentFinalisedDate string          `json:"paymentFinalisedDate,omitempty"`
+	ReversalRefNum       string          `json:"reversalRefNum,omitempty"`
+	PrestoReversalRefNum string          `json:"prestoReversalRefNum,omitempty"`
+	ReversalStatus       string          `json:"reversalStatus,omitempty"`
+	ReversalDate         string          `json:"reversalDate,omitempty"`
+	RefundRefNum         string          `json:"refundRefNum,omitempty"`
+	PrestoRefundRefNum   string          `json:"prestoRefundRefNum,omitempty"`
+	RefundStatus         string          `json:"refundStatus,omitempty"`
+	RefundRequestDate    string          `json:"refundRequestDate,omitempty"`
+	RefundFinalisedDate  string          `json:"refundFinalisedDate,omitempty"`
+	AdditionalData       string          `json:"additionalData,omitempty"`
+	RefundDetails        []RefundDetail  `json:"refundDetails,omitempty"`
+	PaymentDetails       []PaymentDetail `json:"paymentDetails,omitempty"`
 }
 
 // ReverseRequest reverses a payment. ReversalRefNum and one of PaymentRefNum
 // / TxnRefNum are required.
 type ReverseRequest struct {
-	PrestoMRN      string
-	ReversalRefNum string
-	PaymentRefNum  string
-	TxnRefNum      string
-	Remark         string
-	NotifyURL      string
+	PrestoMRN      string `json:"prestoMrn"`
+	ReversalRefNum string `json:"reversalRefNum"`
+	PaymentRefNum  string `json:"paymentRefNum,omitempty"`
+	TxnRefNum      string `json:"txnRefNum,omitempty"`
+	Remark         string `json:"remark,omitempty"`
+	NotifyURL      string `json:"notifyUrl,omitempty"`
 }
 
 // ReverseResponse is the result of a successful Reverse.
 type ReverseResponse struct {
-	PrestoMRN            string
-	PaymentRefNum        string
-	PrestoReversalRefNum string
-	Amount               int64
-	CurrencyCode         string
-	PaymentStatus        string
+	PrestoMRN            string `json:"prestoMrn"`
+	PaymentRefNum        string `json:"paymentRefNum"`
+	PrestoReversalRefNum string `json:"prestoReversalRefNum,omitempty"`
+	Amount               int64  `json:"amount"`
+	CurrencyCode         string `json:"currencyCode,omitempty"`
+	PaymentStatus        string `json:"paymentStatus,omitempty"`
 }
 
 // RefundRequest requests a refund. PaymentRefNum, RefundRefNum and Remark
 // are required; Amount is optional and omitted for a full refund.
 type RefundRequest struct {
-	PrestoMRN     string
-	PaymentRefNum string
-	RefundRefNum  string
-	Remark        string
-	NotifyURL     string
-	Amount        int64
+	PrestoMRN     string `json:"prestoMrn"`
+	PaymentRefNum string `json:"paymentRefNum"`
+	RefundRefNum  string `json:"refundRefNum"`
+	Remark        string `json:"remark"`
+	NotifyURL     string `json:"notifyUrl,omitempty"`
+	Amount        int64  `json:"amount,omitempty"`
 }
 
 // RefundResponse is the result of a successful Refund.
 type RefundResponse struct {
-	PrestoMRN          string
-	PaymentRefNum      string
-	PrestoRefundRefNum string
-	Amount             int64
-	RefundAmount       int64
-	CurrencyCode       string
-	PaymentStatus      string
-	RefundedDate       string
+	PrestoMRN          string `json:"prestoMrn"`
+	PaymentRefNum      string `json:"paymentRefNum"`
+	PrestoRefundRefNum string `json:"prestoRefundRefNum,omitempty"`
+	Amount             int64  `json:"amount"`
+	RefundAmount       int64  `json:"refundAmount,omitempty"`
+	CurrencyCode       string `json:"currencyCode,omitempty"`
+	PaymentStatus      string `json:"paymentStatus,omitempty"`
+	RefundedDate       string `json:"refundedDate,omitempty"`
 }
 
 // PaymentsAPI groups the four payment operations under one client.
