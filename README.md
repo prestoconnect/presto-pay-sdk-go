@@ -179,6 +179,7 @@ redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves ar
 ## Samples
 
 - [examples/net-http/](examples/net-http/) — a runnable demo against Presto's real staging gateway using only
-  `net/http`: checkout, query, reverse, refund, and webhook handling that dedupes on `EventRefNum`.
+  `net/http` and `html/template`: a checkout page with a hosted-vs-self-selected payment method toggle, a return
+  page, JSON endpoints for query/reverse/refund, and webhook handling that dedupes on `EventRefNum`.
 
 More examples (`chi`, Lambda) are tracked in [go-plan.md §12](../go-plan.md#12-milestones).

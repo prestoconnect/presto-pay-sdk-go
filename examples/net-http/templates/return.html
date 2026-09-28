@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Payment return — Presto Pay SDK Go demo</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 40px auto; padding: 0 16px; color: #222; }
+    dt { font-weight: 600; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Payment return</h1>
+  {{if .Error}}
+    <p>Could not look up this payment: {{.Error}}</p>
+  {{else}}
+    <dl>
+      <dt>Transaction ref</dt><dd>{{.TxnRefNum}}</dd>
+      <dt>Payment ref</dt><dd>{{.PaymentRefNum}}</dd>
+      <dt>Status</dt><dd><strong>{{.PaymentStatus}}</strong></dd>
+      <dt>Amount</dt><dd>{{.Amount}} {{.CurrencyCode}}</dd>
+    </dl>
+    <p>This reflects the query result at the moment you were redirected back — the webhook (if it can reach
+    this server) may update the status again shortly after.</p>
+  {{end}}
+  <p><a href="/">Back to checkout</a></p>
+</body>
+</html>

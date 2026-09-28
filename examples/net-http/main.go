@@ -4,18 +4,34 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/prestoconnect/presto-pay-sdk-go/prestopay"
 )
+
+//go:embed templates/*.html
+var templateFS embed.FS
+
+var templates = template.Must(template.ParseFS(templateFS, "templates/*.html"))
+
+var paymentMethodChoices = []string{
+	prestopay.PaymentMethodWallet,
+	prestopay.PaymentMethodCard,
+	prestopay.PaymentMethodTouchNGoEWallet,
+	prestopay.PaymentMethodGrabPay,
+	prestopay.PaymentMethodBoost,
+}
 
 func main() {
 	loadDotEnv(".env")
@@ -54,59 +70,132 @@ func main() {
 			"webhook delivery.", baseURL)
 	}
 
-	deliveries := newDeliveryLog()
+	st := newStore()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", handleHome)
+	mux.HandleFunc("GET /", handleHome(st))
 	mux.HandleFunc("POST /checkout", handleCheckout(client, prestoMRN, baseURL))
+	mux.HandleFunc("GET /return/{txnRefNum}", handleReturn(client, prestoMRN))
 	mux.HandleFunc("GET /payments/{paymentRefNum}", handleQuery(client, prestoMRN))
 	mux.HandleFunc("POST /payments/{paymentRefNum}/reverse", handleReverse(client, prestoMRN))
 	mux.HandleFunc("POST /payments/{paymentRefNum}/refund", handleRefund(client, prestoMRN))
-	mux.HandleFunc("POST /presto/notify", handleNotify(verifier, deliveries))
+	mux.HandleFunc("POST /presto/notify", handleNotify(verifier, st))
 
 	log.Printf("Presto Pay SDK demo listening on http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
 
-func handleHome(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Presto Pay SDK Go demo is running. See README.md for the route table and curl examples.")
+func handleHome(st *store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data := struct {
+			ShowMethods    bool
+			PaymentMethods []string
+			Events         []recentEvent
+		}{
+			ShowMethods:    r.URL.Query().Get("showMethods") == "1",
+			PaymentMethods: paymentMethodChoices,
+			Events:         st.recentEvents(),
+		}
+		if err := templates.ExecuteTemplate(w, "index.html", data); err != nil {
+			log.Printf("rendering index.html: %v", err)
+		}
+	}
 }
 
+// handleCheckout serves both the browser form (redirects to the hosted
+// payment page on success) and a JSON API for curl, distinguished by
+// Content-Type.
 func handleCheckout(client *prestopay.Client, prestoMRN, baseURL string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var input struct {
-			TxnRefNum    string `json:"txnRefNum"`
-			Amount       int64  `json:"amount"`
-			CurrencyCode string `json:"currencyCode"`
+		isJSON := strings.Contains(r.Header.Get("Content-Type"), "application/json")
+
+		var (
+			txnRefNum    string
+			amount       int64
+			currencyCode string
+			methods      []string
+		)
+		if isJSON {
+			var input struct {
+				TxnRefNum    string `json:"txnRefNum"`
+				Amount       int64  `json:"amount"`
+				CurrencyCode string `json:"currencyCode"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&input)
+			txnRefNum, amount, currencyCode = input.TxnRefNum, input.Amount, input.CurrencyCode
+		} else {
+			_ = r.ParseForm()
+			amount, _ = strconv.ParseInt(r.FormValue("amount"), 10, 64)
+			currencyCode = r.FormValue("currencyCode")
+			if method := r.FormValue("paymentMethod"); method != "" {
+				methods = []string{method}
+			}
 		}
-		if r.Body != nil {
-			_ = json.NewDecoder(r.Body).Decode(&input) // best-effort; zero values below fill the rest
+		if txnRefNum == "" {
+			txnRefNum = fmt.Sprintf("order-%d", time.Now().UnixNano())
 		}
-		if input.TxnRefNum == "" {
-			input.TxnRefNum = fmt.Sprintf("order-%d", time.Now().UnixNano())
+		if currencyCode == "" {
+			currencyCode = "MYR"
 		}
-		if input.CurrencyCode == "" {
-			input.CurrencyCode = "MYR"
-		}
-		if input.Amount == 0 {
-			input.Amount = 1000
+		if amount == 0 {
+			amount = 1000
 		}
 
 		res, err := client.Payments.Init(r.Context(), prestopay.InitRequest{
-			PrestoMRN:    prestoMRN,
-			TxnType:      prestopay.TxnTypeWebPay,
-			TxnRefNum:    input.TxnRefNum,
-			DisplayDesc:  "Go SDK demo order " + input.TxnRefNum,
-			Amount:       input.Amount,
-			CurrencyCode: input.CurrencyCode,
-			NotifyURL:    baseURL + "/presto/notify",
-			RedirectURL:  baseURL + "/return/" + input.TxnRefNum,
+			PrestoMRN:             prestoMRN,
+			TxnType:               prestopay.TxnTypeWebPay,
+			TxnRefNum:             txnRefNum,
+			DisplayDesc:           "Go SDK demo order " + txnRefNum,
+			Amount:                amount,
+			CurrencyCode:          currencyCode,
+			NotifyURL:             baseURL + "/presto/notify",
+			RedirectURL:           baseURL + "/return/" + txnRefNum,
+			AllowedPaymentMethods: methods,
 		})
 		if err != nil {
-			writePrestoError(w, err)
+			if isJSON {
+				writePrestoError(w, err)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusBadGateway)
 			return
 		}
-		writeJSON(w, http.StatusOK, res)
+
+		if isJSON {
+			writeJSON(w, http.StatusOK, res)
+			return
+		}
+		http.Redirect(w, r, res.PaymentURL, http.StatusSeeOther)
+	}
+}
+
+func handleReturn(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		txnRefNum := r.PathValue("txnRefNum")
+		res, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
+			PrestoMRN: prestoMRN,
+			TxnRefNum: txnRefNum,
+		})
+
+		data := struct {
+			Error         string
+			TxnRefNum     string
+			PaymentRefNum string
+			PaymentStatus string
+			Amount        int64
+			CurrencyCode  string
+		}{TxnRefNum: txnRefNum}
+		if err != nil {
+			data.Error = err.Error()
+		} else {
+			data.PaymentRefNum = res.PaymentRefNum
+			data.PaymentStatus = res.PaymentStatus
+			data.Amount = res.Amount
+			data.CurrencyCode = res.CurrencyCode
+		}
+		if err := templates.ExecuteTemplate(w, "return.html", data); err != nil {
+			log.Printf("rendering return.html: %v", err)
+		}
 	}
 }
 
@@ -162,7 +251,7 @@ func handleRefund(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
 // Presto redelivers an undelivered webhook up to five times: acking an
 // already-seen delivery with AckOK (rather than refulfilling) is what keeps
 // that safe.
-func handleNotify(verifier *prestopay.WebhookVerifier, deliveries *deliveryLog) http.HandlerFunc {
+func handleNotify(verifier *prestopay.WebhookVerifier, st *store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		event, err := verifier.VerifyRequest(r)
 		if err != nil {
@@ -170,11 +259,17 @@ func handleNotify(verifier *prestopay.WebhookVerifier, deliveries *deliveryLog) 
 			prestopay.WriteAck(w, prestopay.AckForError(err))
 			return
 		}
-		if !deliveries.firstDelivery(event.EventRefNum) {
+		if !st.firstDelivery(event.EventRefNum) {
 			log.Printf("duplicate webhook delivery for eventRefNum=%s; acking without refulfilling", event.EventRefNum)
 			prestopay.WriteAck(w, prestopay.AckOK)
 			return
 		}
+		st.recordEvent(recentEvent{
+			ReceivedAt:    time.Now().Format(time.RFC3339),
+			EventCode:     event.EventCode,
+			PaymentRefNum: event.PaymentRefNum,
+			PaymentStatus: event.PaymentStatus,
+		})
 		log.Printf("webhook: prestoMrn=%s paymentRefNum=%s eventCode=%s paymentStatus=%s",
 			event.PrestoMRN, event.PaymentRefNum, event.EventCode, event.PaymentStatus)
 		prestopay.WriteAck(w, prestopay.AckOK)
@@ -209,23 +304,52 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 	_ = json.NewEncoder(w).Encode(body)
 }
 
-// deliveryLog is the demo's dedupe store. A real merchant would use its
-// database's uniqueness constraints instead of an in-memory map.
-type deliveryLog struct {
-	mu   sync.Mutex
-	seen map[string]bool
+// recentEvent is a webhook delivery shown on the checkout and return pages.
+type recentEvent struct {
+	ReceivedAt    string
+	EventCode     string
+	PaymentRefNum string
+	PaymentStatus string
 }
 
-func newDeliveryLog() *deliveryLog { return &deliveryLog{seen: make(map[string]bool)} }
+const maxRecentEvents = 20
 
-func (d *deliveryLog) firstDelivery(eventRefNum string) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if d.seen[eventRefNum] {
+// store is the demo's dedupe and recent-activity state. A real merchant
+// would use its database's uniqueness constraints instead of an in-memory
+// map, and would not need the recent-events list at all.
+type store struct {
+	mu     sync.Mutex
+	seen   map[string]bool
+	events []recentEvent
+}
+
+func newStore() *store { return &store{seen: make(map[string]bool)} }
+
+func (s *store) firstDelivery(eventRefNum string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.seen[eventRefNum] {
 		return false
 	}
-	d.seen[eventRefNum] = true
+	s.seen[eventRefNum] = true
 	return true
+}
+
+func (s *store) recordEvent(e recentEvent) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.events = append([]recentEvent{e}, s.events...)
+	if len(s.events) > maxRecentEvents {
+		s.events = s.events[:maxRecentEvents]
+	}
+}
+
+func (s *store) recentEvents() []recentEvent {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]recentEvent, len(s.events))
+	copy(out, s.events)
+	return out
 }
 
 // loadDotEnv sets variables from a .env file without overriding anything
