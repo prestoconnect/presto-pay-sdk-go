@@ -14,8 +14,9 @@ still move.** See [go-plan.md](../go-plan.md) for the full design and milestones
 Milestones 1–5 are complete: module and package layout, CI, `prestopay.New` (client and key validation), the
 error types, key loading, canonicalization, timestamp formatting, the four payment operations (`Init`, `Query`,
 `Reverse`, `Refund`) with validation, response mapping, and the `Raw` escape hatch, webhook verification, and
-`ConfigFromEnv` are all implemented and tested today. Remaining work — samples, release engineering — is tracked
-in [go-plan.md §12](../go-plan.md#12-milestones).
+`ConfigFromEnv` are all implemented and tested today. See [CHANGELOG.md](CHANGELOG.md) for details. Remaining
+work — the wire-contract vectors, more examples, release engineering — is tracked in
+[go-plan.md §12](../go-plan.md#12-milestones).
 
 ## Contents
 
@@ -113,6 +114,11 @@ res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
 `Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too. See
 [go-plan.md §3.9](../go-plan.md#39-idempotency-and-retries).
 
+If you supply a custom `Config.HTTPClient` or `Transport`, never set an `Idempotency-Key` or
+`X-Idempotency-Key` header: `net/http` treats a POST carrying either as replayable and may silently resend it on
+a broken idle connection, which is exactly the transparent retry this SDK's idempotency guarantees depend on
+not happening.
+
 ## Webhooks
 
 See [go-plan.md §7](../go-plan.md#7-webhooks) for the full design:
@@ -172,5 +178,7 @@ redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves ar
 
 ## Samples
 
-Not yet published. `examples/` is reserved for `net/http`, `chi`, and Lambda examples, planned for Milestone 6
-alongside the v0.1.0 release (see [go-plan.md §12](../go-plan.md#12-milestones)).
+- [examples/net-http/](examples/net-http/) — a runnable demo against Presto's real staging gateway using only
+  `net/http`: checkout, query, reverse, refund, and webhook handling that dedupes on `EventRefNum`.
+
+More examples (`chi`, Lambda) are tracked in [go-plan.md §12](../go-plan.md#12-milestones).
