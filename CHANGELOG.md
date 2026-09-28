@@ -28,6 +28,8 @@ Pre-1.0; nothing has been tagged yet.
   `html/template`.
 - `examples/chi/`: the same demo routed with `chi` instead of the stdlib mux.
 - `examples/lambda/`: a webhook-only receiver deployed as an AWS Lambda function behind API Gateway.
+- A staging smoke test (`prestopay/staging_test.go`, `-tags staging`, gated behind `PRESTOPAY_STAGING_SMOKE=1`)
+  that calls the real gateway: `Init`, an immediate `Query`, and a duplicate `Init` confirming error `1203`.
 
 ### Known limitations
 
@@ -35,4 +37,4 @@ Pre-1.0; nothing has been tagged yet.
   and in the key-loading error messages).
 - The shared wire-contract test vectors are not yet vendored into `spec/`; contract tests are hand-written against
   captured request/response examples instead.
-- No release has been tagged; a staging smoke test and publishing to pkg.go.dev are still open.
+- No release has been tagged; publishing to pkg.go.dev is still open.
