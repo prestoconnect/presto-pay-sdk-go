@@ -6,7 +6,7 @@ instead of the stdlib `http.ServeMux`. The SDK itself has no opinion about which
 routing and URL-parameter extraction (`chi.URLParam`) differ, plus `chi`'s `Logger`/`Recoverer` middleware.
 
 Unlike the main SDK module, this example has its own `go.mod` with real third-party dependencies (`chi`) — the
-SDK module itself stays dependency-free. It depends on the tagged `v0.1.0` release, the same way any other
+SDK module itself stays dependency-free. It depends on the tagged `v0.2.0` release, the same way any other
 consumer would.
 
 ## Run it

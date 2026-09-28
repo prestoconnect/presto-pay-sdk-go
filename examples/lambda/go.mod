@@ -4,5 +4,5 @@ go 1.26
 
 require (
 	github.com/aws/aws-lambda-go v1.55.1
-	github.com/prestoconnect/presto-pay-sdk-go v0.1.0
+	github.com/prestoconnect/presto-pay-sdk-go v0.2.0
 )

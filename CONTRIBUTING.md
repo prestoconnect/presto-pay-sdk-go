@@ -41,7 +41,7 @@ PRESTOPAY_STAGING_SMOKE=1 go test -tags staging ./prestopay/... -run TestStaging
 
 1. Set `Version` in `prestopay/version.go` to the release version (no `-dev` suffix) and move the CHANGELOG
    `Unreleased` entries under that version.
-2. Commit, then push a matching tag, e.g. `git tag v0.2.0 && git push origin v0.2.0`.
+2. Commit, then push a matching tag, e.g. `git tag v0.3.0 && git push origin v0.3.0`.
 3. pkg.go.dev indexes the new version automatically the first time it (or the module proxy) is fetched —
    no separate publish step, unlike Maven Central or npm.
 4. Bump `Version` back to the next `-dev` suffix, e.g. `0.3.0-dev` after releasing `v0.2.0`.

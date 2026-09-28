@@ -200,7 +200,7 @@ redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves ar
   Gateway, holding no private key since verification needs none.
 
 `examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies, depending on the
-tagged `v0.1.0` release like any other consumer would — the SDK module itself stays dependency-free.
+tagged `v0.2.0` release like any other consumer would — the SDK module itself stays dependency-free.
 `examples/net-http` has no `go.mod` of its own; it's part of the root module and always builds against the
 current source.
 

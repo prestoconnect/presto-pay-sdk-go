@@ -6,7 +6,7 @@ key, so the function holds no signing material at all, only Presto's public key 
 
 This example has its own `go.mod` with a real third-party dependency (`aws-lambda-go`) and a newer Go
 requirement than the SDK itself (`aws-lambda-go` currently requires Go 1.26); the SDK module stays
-dependency-free. It depends on the tagged `v0.1.0` release, the same way any other consumer would.
+dependency-free. It depends on the tagged `v0.2.0` release, the same way any other consumer would.
 
 ## What it does
 
