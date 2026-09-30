@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-30
+
 ### Changed
 
 - **Breaking:** `NotifyEvent.PaymentStatus` is removed. A webhook reports what happened (`EventCode`, `Success`),

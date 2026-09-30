@@ -29,7 +29,7 @@ go get github.com/prestoconnect/presto-pay-sdk-go
 ```
 
 Pin a specific release tag for reproducible builds, e.g.
-`go get github.com/prestoconnect/presto-pay-sdk-go@v0.2.0`.
+`go get github.com/prestoconnect/presto-pay-sdk-go@v0.3.0`.
 
 ## Quick start
 
