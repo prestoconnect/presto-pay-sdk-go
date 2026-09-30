@@ -3,6 +3,7 @@ package prestopay
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -48,45 +49,37 @@ func TestWebhookVerifier_Success_AuthorisedTrue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
-	if event.PaymentStatus != PaymentStatusAuthorised {
-		t.Fatalf("PaymentStatus = %q, want %q", event.PaymentStatus, PaymentStatusAuthorised)
+	if event.EventCode != EventCodeAuthorised || !event.Success {
+		t.Fatalf("EventCode/Success = %q/%t, want %q/true", event.EventCode, event.Success, EventCodeAuthorised)
 	}
 	if event.EventRefNum != "evt-1" || event.Amount != 10_000 || event.PrestoMRN != "PM1" {
 		t.Fatalf("event = %+v", event)
 	}
 }
 
-func TestWebhookVerifier_Success_AuthorisedFalseMeansFailed(t *testing.T) {
+// A webhook says what happened, not the payment's resulting status: the
+// event carries eventCode and success exactly as sent and derives nothing,
+// so a failed Refunded (which leaves the payment as it was) is reported as
+// just that.
+func TestWebhookVerifier_ReportsEventCodeAndSuccessAsSent(t *testing.T) {
 	privatePEM, certPEM := testMaterial(t)
 	sign := gatewaySigner(t, privatePEM)
 	now := time.Now()
 	v := newWebhookVerifier(t, certPEM, func(cfg *WebhookConfig) { cfg.Now = func() time.Time { return now } })
 
-	fields := validWebhookFields(now)
-	fields["success"] = false
-	event, err := v.Verify(sign(fields))
-	if err != nil {
-		t.Fatalf("Verify: %v", err)
-	}
-	if event.PaymentStatus != PaymentStatusFailed {
-		t.Fatalf("PaymentStatus = %q, want %q", event.PaymentStatus, PaymentStatusFailed)
-	}
-}
-
-func TestWebhookVerifier_NonAuthorisedEventCodeIsItsOwnStatus(t *testing.T) {
-	privatePEM, certPEM := testMaterial(t)
-	sign := gatewaySigner(t, privatePEM)
-	now := time.Now()
-	v := newWebhookVerifier(t, certPEM, func(cfg *WebhookConfig) { cfg.Now = func() time.Time { return now } })
-
-	fields := validWebhookFields(now)
-	fields["eventCode"] = EventCodeRefunded
-	event, err := v.Verify(sign(fields))
-	if err != nil {
-		t.Fatalf("Verify: %v", err)
-	}
-	if event.PaymentStatus != EventCodeRefunded {
-		t.Fatalf("PaymentStatus = %q, want %q", event.PaymentStatus, EventCodeRefunded)
+	for _, eventCode := range []string{EventCodeAuthorised, EventCodeRefunded, EventCodeReversed, EventCodeCancelled} {
+		for _, success := range []bool{true, false} {
+			fields := validWebhookFields(now)
+			fields["eventCode"] = eventCode
+			fields["success"] = success
+			event, err := v.Verify(sign(fields))
+			if err != nil {
+				t.Fatalf("Verify(%s, %t): %v", eventCode, success, err)
+			}
+			if event.EventCode != eventCode || event.Success != success {
+				t.Fatalf("EventCode/Success = %q/%t, want %q/%t", event.EventCode, event.Success, eventCode, success)
+			}
+		}
 	}
 }
 
@@ -227,6 +220,24 @@ func TestAckForError(t *testing.T) {
 	}
 	if AckForError(errors.New("transient")) != AckResend {
 		t.Fatal("any other error should get AckResend")
+	}
+}
+
+// A Query made inside the webhook handler that gets a bad or unsigned
+// response is the merchant's failure, not the webhook's: answering AckOK would
+// tell Presto to stop delivering an event the handler never processed.
+func TestAckForError_OutboundCallFailureAsksForResend(t *testing.T) {
+	sigErr := newSignatureError(OpQuery, "response", "", false)
+	if AckForError(sigErr) != AckResend {
+		t.Fatal("a response *SignatureError from Query should get AckResend")
+	}
+	respErr := newResponseError(OpQuery, "response", nil, errors.New("x"), false, nil)
+	if AckForError(respErr) != AckResend {
+		t.Fatal("a response *ResponseError from Query should get AckResend")
+	}
+	wrapped := fmt.Errorf("fulfil: %w", respErr)
+	if AckForError(wrapped) != AckResend {
+		t.Fatal("a wrapped response *ResponseError should get AckResend")
 	}
 }
 

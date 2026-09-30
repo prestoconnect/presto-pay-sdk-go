@@ -159,6 +159,12 @@ A verifier needs no private key, so a webhook-only service configures nothing el
 material. `MerchantIDs` is a set — Presto signs webhooks for every merchant with the same key, so the `mid`
 check is mandatory, not defensive.
 
+A webhook says what happened to a payment (`EventCode`, and `Success` for whether it worked), not the payment's
+resulting status — a failed `Refunded`, for example, leaves the payment as it was. `NotifyEvent` therefore
+carries no status. When the handler needs it, call `client.Payments.Query` with the event's `PrestoMRN` and
+`PaymentRefNum`; if that fails, `AckForError` answers `AckResend` so Presto delivers the event again. Mark
+`EventRefNum` as processed only after the query succeeds, so that redelivery isn't mistaken for a duplicate.
+
 ## Errors
 
 Implemented today. Every error type returned by this package satisfies:

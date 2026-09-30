@@ -4,6 +4,22 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- **Breaking:** `NotifyEvent.PaymentStatus` is removed. A webhook reports what happened (`EventCode`, `Success`),
+  not the payment's resulting status, and deriving one was guesswork: a `Refunded` or `Reversed` event with
+  `Success: false` is a refund or reversal that failed, leaving the payment in its previous status, which the
+  event does not carry. Call `Payments.Query` for the current status. This follows the shared wire contract.
+- The `net-http` and `chi` examples query the payment in their webhook handler and list the returned status.
+  They mark `EventRefNum` as seen only after the query succeeds, so a failed query's redelivery is not dropped as
+  a duplicate.
+
+### Fixed
+
+- `AckForError` answered `AckOK` for any `*SignatureError` or `*ResponseError`, including ones from a `Query`
+  made inside the webhook handler, which told Presto to stop redelivering an event the handler never processed.
+  It now answers `AckOK` only for errors whose `Source` is `"webhook"`, and `AckResend` for everything else.
+
 ## 0.2.0 - 2026-09-28
 
 ### Changed

@@ -34,12 +34,6 @@ type NotifyEvent struct {
 	UserRefNum     string          `json:"userRefNum,omitempty"`
 	AdditionalData string          `json:"additionalData,omitempty"`
 	PaymentDetails []PaymentDetail `json:"paymentDetails,omitempty"`
-
-	// PaymentStatus is derived: for EventCodeAuthorised it reflects Success
-	// (PaymentStatusAuthorised or PaymentStatusFailed); for every other event
-	// code it is the event code itself. Query remains the authoritative
-	// source of payment state.
-	PaymentStatus string `json:"paymentStatus"`
 }
 
 // WebhookConfig configures a WebhookVerifier.
@@ -205,15 +199,6 @@ func (v *WebhookVerifier) Verify(body []byte) (NotifyEvent, error) {
 		return NotifyEvent{}, err
 	}
 
-	paymentStatus := eventCode
-	if eventCode == EventCodeAuthorised {
-		if success {
-			paymentStatus = PaymentStatusAuthorised
-		} else {
-			paymentStatus = PaymentStatusFailed
-		}
-	}
-
 	return NotifyEvent{
 		MID:            mid,
 		EventCode:      eventCode,
@@ -229,7 +214,6 @@ func (v *WebhookVerifier) Verify(body []byte) (NotifyEvent, error) {
 		UserRefNum:     stringField(decoded, "userRefNum"),
 		AdditionalData: stringField(decoded, "additionalData"),
 		PaymentDetails: paymentDetails,
-		PaymentStatus:  paymentStatus,
 	}, nil
 }
 
@@ -265,9 +249,16 @@ func WriteAck(w http.ResponseWriter, ack Ack) {
 // AckOK rather than looping Presto's retry schedule. Anything else is
 // treated as the caller's own transient failure and gets AckResend.
 func AckForError(err error) Ack {
+	// Only a webhook that failed verification fails the same way on every
+	// redelivery. The same error types from an outbound call inside the
+	// handler (a Query for the payment's status, say) are the merchant's own
+	// failure, and the event must be delivered again.
 	var sigErr *SignatureError
+	if errors.As(err, &sigErr) && sigErr.Source == "webhook" {
+		return AckOK
+	}
 	var respErr *ResponseError
-	if errors.As(err, &sigErr) || errors.As(err, &respErr) {
+	if errors.As(err, &respErr) && respErr.Source == "webhook" {
 		return AckOK
 	}
 	return AckResend

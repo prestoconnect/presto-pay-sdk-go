@@ -48,8 +48,11 @@ func handleRequest(ctx context.Context, req events.APIGatewayProxyRequest) (even
 	// A real function would look up event.EventRefNum in a table with a
 	// uniqueness constraint here, and only fulfil on the first sighting —
 	// Presto redelivers an unacknowledged webhook up to five times.
-	log.Printf("webhook: prestoMrn=%s paymentRefNum=%s eventCode=%s paymentStatus=%s",
-		event.PrestoMRN, event.PaymentRefNum, event.EventCode, event.PaymentStatus)
+	// A webhook says what happened, not the payment's resulting status: a
+	// function that needs the status calls Payments.Query here, and answers
+	// AckForError(err) if that fails so Presto delivers the event again.
+	log.Printf("webhook: prestoMrn=%s paymentRefNum=%s eventCode=%s success=%t",
+		event.PrestoMRN, event.PaymentRefNum, event.EventCode, event.Success)
 
 	return ackResponse(prestopay.AckOK), nil
 }

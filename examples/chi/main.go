@@ -91,7 +91,7 @@ func main() {
 	r.Get("/payments/{paymentRefNum}", handleQuery(client, prestoMRN))
 	r.Post("/payments/{paymentRefNum}/reverse", handleReverse(client, prestoMRN))
 	r.Post("/payments/{paymentRefNum}/refund", handleRefund(client, prestoMRN))
-	r.Post("/presto/notify", handleNotify(verifier, st))
+	r.Post("/presto/notify", handleNotify(client, verifier, st))
 
 	log.Printf("Presto Pay SDK chi demo listening on http://localhost:%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
@@ -270,11 +270,24 @@ func handleRefund(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
 // Presto redelivers an undelivered webhook up to five times: acking an
 // already-seen delivery with AckOK (rather than refulfilling) is what keeps
 // that safe.
-func handleNotify(verifier *prestopay.WebhookVerifier, st *store) http.HandlerFunc {
+func handleNotify(client *prestopay.Client, verifier *prestopay.WebhookVerifier, st *store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		event, err := verifier.VerifyRequest(r)
 		if err != nil {
 			log.Printf("webhook verification failed: %v", err)
+			prestopay.WriteAck(w, prestopay.AckForError(err))
+			return
+		}
+		// A webhook says what happened, not the payment's resulting status, so
+		// ask Presto. The event is only marked as seen after this succeeds: if
+		// the query fails, AckForError asks for a resend, and that redelivery
+		// must not be mistaken for a duplicate.
+		payment, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
+			PrestoMRN:     event.PrestoMRN,
+			PaymentRefNum: event.PaymentRefNum,
+		})
+		if err != nil {
+			log.Printf("webhook eventRefNum=%s: query failed, asking Presto to resend: %v", event.EventRefNum, err)
 			prestopay.WriteAck(w, prestopay.AckForError(err))
 			return
 		}
@@ -287,10 +300,10 @@ func handleNotify(verifier *prestopay.WebhookVerifier, st *store) http.HandlerFu
 			ReceivedAt:    time.Now().Format(time.RFC3339),
 			EventCode:     event.EventCode,
 			PaymentRefNum: event.PaymentRefNum,
-			PaymentStatus: event.PaymentStatus,
+			PaymentStatus: payment.PaymentStatus,
 		})
-		log.Printf("webhook: prestoMrn=%s paymentRefNum=%s eventCode=%s paymentStatus=%s",
-			event.PrestoMRN, event.PaymentRefNum, event.EventCode, event.PaymentStatus)
+		log.Printf("webhook: prestoMrn=%s paymentRefNum=%s eventCode=%s success=%t queried paymentStatus=%s",
+			event.PrestoMRN, event.PaymentRefNum, event.EventCode, event.Success, payment.PaymentStatus)
 		prestopay.WriteAck(w, prestopay.AckOK)
 	}
 }
