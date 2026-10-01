@@ -32,7 +32,7 @@ deliver webhooks to localhost — see below to fix that.
 | `GET /payments/{paymentRefNum}` | `client.Payments.Query(...)` by `paymentRefNum`, for `curl` |
 | `POST /payments/{paymentRefNum}/reverse` | `client.Payments.Reverse(...)` |
 | `POST /payments/{paymentRefNum}/refund` | `client.Payments.Refund(...)` |
-| `POST /presto/notify` | `prestopay.NewWebhookVerifier(...).VerifyRequest(...)`, `WriteAck`/`AckForError`, and deduping deliveries on `EventRefNum` before doing any fulfilment work — shown in the "Recent webhooks" table on the checkout page |
+| `POST /presto/notify` | `prestopay.NewWebhookVerifier(...).VerifyRequest(...)`, `WriteAck`/`AckForError`, HTTP 401 for a `*SignatureError`, and deduping deliveries on `EventRefNum` before doing any fulfilment work — shown in the "Recent webhooks" table on the checkout page |
 
 Selecting a payment method on this site is not a replacement payment processor: it demonstrates the merchant UI
 and SDK request that restricts which method Presto displays. The final authorization still happens on the

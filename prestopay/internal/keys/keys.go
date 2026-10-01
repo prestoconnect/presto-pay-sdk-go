@@ -26,16 +26,16 @@ var (
 
 const minRSABits = 2048
 
-// LoadPrivateKey parses a PKCS#8 PEM-encoded RSA private key, as delivered
-// after converting the onboarding PKCS#12 keystore.
+// LoadPrivateKey parses a PKCS#8 PEM-encoded RSA private key of at least
+// 2048 bits.
 func LoadPrivateKey(pemBytes []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(pemBytes)
 	if block == nil {
-		// The most likely cause of "not PEM at all" is the onboarding
-		// PKCS#12 keystore passed in unconverted, so the fix goes in the
-		// message rather than making the caller go find it.
-		return nil, fmt.Errorf("%w; if this is the onboarding .p12 keystore, convert it first: "+
-			"openssl pkcs12 -in partner.p12 -nocerts -nodes -out partner-key.pem", ErrNoPEMBlock)
+		// The most likely cause of "not PEM at all" is a PKCS#12 keystore
+		// passed in unconverted, so the fix goes in the message rather than
+		// making the caller go find it.
+		return nil, fmt.Errorf("%w; if this is a .p12 keystore, convert it first: "+
+			"openssl pkcs12 -in merchant.p12 -nocerts -nodes -out merchant-key.pem", ErrNoPEMBlock)
 	}
 
 	switch block.Type {

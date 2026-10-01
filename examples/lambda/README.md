@@ -13,7 +13,7 @@ dependency-free. It depends on the tagged `v0.2.0` release, the same way any oth
 `handleRequest` reads the raw request body from the API Gateway event and calls `verifier.Verify(body)` — the
 same verifier used by the net/http and chi demos, just fed a byte slice instead of an `*http.Request`, since
 `Verify` exists exactly for consumers (queues, Lambda events) that have already buffered the body. It logs the
-verified event and acknowledges with `AckOK`/`AckForError`, reusing `WriteAck` by recording it into an
+verified event and acknowledges with `AckOK`/`AckForError`, answering HTTP 401 for a `*SignatureError`, and reusing `WriteAck` by recording it into an
 `httptest.ResponseRecorder` and copying the status/body into the Lambda response — the notify-ack contract stays
 defined in one place regardless of which example calls it.
 

@@ -269,6 +269,11 @@ func handleNotify(client *prestopay.Client, verifier *prestopay.WebhookVerifier,
 		event, err := verifier.VerifyRequest(r)
 		if err != nil {
 			log.Printf("webhook verification failed: %v", err)
+			var sigErr *prestopay.SignatureError
+			if errors.As(err, &sigErr) {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 			prestopay.WriteAck(w, prestopay.AckForError(err))
 			return
 		}
