@@ -1,218 +1,256 @@
-# presto-pay-sdk-go
+# Presto Pay SDK for Go
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/prestoconnect/presto-pay-sdk-go/prestopay.svg)](https://pkg.go.dev/github.com/prestoconnect/presto-pay-sdk-go/prestopay)
 [![CI](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml/badge.svg)](https://github.com/prestoconnect/presto-pay-sdk-go/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-Standalone, framework-agnostic Go library for the **Presto Connect** payment gateway.
+Accept payments through the **Presto Connect** payment gateway from any Go application. The SDK signs every
+request, verifies every response and webhook, and gives you typed requests and results, so you don't have to
+handle the gateway's signature scheme yourself.
 
-- **Go 1.24+** (1.24, 1.25, 1.26 in CI) — no build tags, no cgo
-- **Zero dependencies** — stdlib only
-- **Thread-safe** `Client` — build once, share across goroutines, like `*sql.DB`
+- **Go 1.24+**, no cgo, works with any router
+- **Zero dependencies**: standard library only
+- **Safe for concurrent use**: build one `*Client` and share it, like `*sql.DB`
 
 ## Contents
 
 - [Install](#install)
+- [Before you start](#before-you-start)
+- [How a payment works](#how-a-payment-works)
 - [Quick start](#quick-start)
-- [Merchant identity](#merchant-identity)
-- [Configuration from environment](#configuration-from-environment)
-- [Retries and idempotency](#retries-and-idempotency)
-- [Webhooks](#webhooks)
-- [Errors](#errors)
-- [Samples](#samples)
-- [Contributing](#contributing)
-- [License](#license)
+- [Payment statuses](#payment-statuses)
+- [Next steps](#next-steps)
 
 ## Install
 
 ```bash
-go get github.com/prestoconnect/presto-pay-sdk-go
+go get github.com/prestoconnect/presto-pay-sdk-go@v0.3.0
 ```
 
-Pin a specific release tag for reproducible builds, e.g.
-`go get github.com/prestoconnect/presto-pay-sdk-go@v0.3.0`.
+The package is `github.com/prestoconnect/presto-pay-sdk-go/prestopay`.
+
+## Before you start
+
+### 1. Create your key pair
+
+You sign every request with your own RSA private key, and Presto verifies it with the matching public key.
+Generate the pair yourself with `openssl`; the private key never leaves your systems:
+
+```bash
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out merchant-key.pem
+openssl req -new -x509 -key merchant-key.pem -days 3650 -subj "/CN=Your Company" -outform DER -out merchant.der
+```
+
+`merchant-key.pem` is your private key in the PKCS#8 PEM format the SDK reads; keep it secret and out of
+source control. Send `merchant.der` (your public key, in the DER format Presto requires) to Presto.
+
+### 2. Get your details from Presto
+
+| From Presto | What it is | Where it goes |
+|-------------|------------|---------------|
+| Merchant ID (`mid`) | Identifies your merchant account | `Config.MerchantID` |
+| Presto merchant reference (`prestoMrn`) | Identifies the shop or outlet; one `mid` can have several | Every request: `PrestoMRN` |
+| Presto certificate (`.der`) | Verifies Presto's responses and webhooks; the SDK reads it as is | `Config.PrestoPublicKeys` |
+
+Staging and production are separate: each has its own `mid`, `prestoMrn` and Presto certificate, and you
+register your public key for each. Never mix them.
+
+## How a payment works
+
+```
+ Your server                      Presto                     Shopper's browser
+     |---- 1. Init ------------------>|                              |
+     |<--- PaymentURL ----------------|                              |
+     |---- 2. redirect to PaymentURL ------------------------------->|
+     |                                |<---- 3. shopper pays --------|
+     |                                |---- 4a. redirect to your RedirectURL -->|
+     |<--- 4b. webhook to your NotifyURL                             |
+     |---- 5. Query ----------------->|                              |
+```
+
+1. Your server calls `Init` with your order's reference and amount. Presto returns a `PaymentURL`.
+2. You redirect the shopper to `PaymentURL`.
+3. The shopper chooses a payment method and pays on Presto's page.
+4. Presto sends the shopper's browser back to your `RedirectURL` **and** POSTs a signed webhook to your
+   `NotifyURL`. These happen independently and can arrive in either order.
+5. On both, you call `Query` to get the payment's status from Presto, and update the order.
+
+The identifiers you'll see:
+
+| Name | Who creates it | What it's for |
+|------|----------------|---------------|
+| `TxnRefNum` | You | Your reference for the payment, such as an order ID. Unique per payment, at most 50 characters |
+| `PaymentRefNum` | Presto | Presto's reference for the payment, returned by `Init` |
+| `EventRefNum` | Presto | Identifies one webhook event; stays the same when Presto redelivers it |
+| `ReversalRefNum`, `RefundRefNum` | You | Your reference for a reversal or a refund |
 
 ## Quick start
 
+### 1. Create the client
+
+Build it once at startup and reuse it. Bad keys fail here, not on the first payment. The webhook verifier
+needs only Presto's certificate and your `mid`.
+
 ```go
+import "github.com/prestoconnect/presto-pay-sdk-go/prestopay"
+
+privateKey, err := os.ReadFile("merchant-key.pem")
+if err != nil {
+    log.Fatal(err)
+}
+prestoCert, err := os.ReadFile("presto.der")
+if err != nil {
+    log.Fatal(err)
+}
+
 client, err := prestopay.New(prestopay.Config{
     Environment:      prestopay.Staging,
-    MerchantID:       os.Getenv("PRESTOPAY_MID"),
-    PrivateKeyPEM:    []byte(os.Getenv("PRESTOPAY_PRIVATE_KEY")),
-    PrestoPublicKeys: [][]byte{[]byte(os.Getenv("PRESTOPAY_PUBLIC_KEY"))},
-})
-
-res, err := client.Payments.Init(ctx, prestopay.InitRequest{
-    PrestoMRN:    "YOUR_PRESTO_MRN",
-    TxnType:      prestopay.TxnTypeWebPay,
-    TxnRefNum:    "order-123",
-    DisplayDesc:  "Order 123",
-    Amount:       10_000,
-    CurrencyCode: "MYR",
-    NotifyURL:    "https://your-app.example/presto/notify",
-    RedirectURL:  "https://your-app.example/presto/return/order-123",
+    MerchantID:       "YOUR_MID",
+    PrivateKeyPEM:    privateKey,
+    PrestoPublicKeys: [][]byte{prestoCert},
 })
 if err != nil {
-    // see Errors below
+    log.Fatal(err)
 }
-res.PaymentURL
+
+verifier, err := prestopay.NewWebhookVerifier(prestopay.WebhookConfig{
+    MerchantIDs:      []string{"YOUR_MID"},
+    PrestoPublicKeys: [][]byte{prestoCert},
+})
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
-`prestopay.New(Config)` builds and validates a `*Client` — merchant ID, private key, and Presto public keys are
-checked eagerly, so a bad key is a `*ConfigError` at construction rather than a mysterious failure on the first
-real call.
+To configure the client from environment variables instead, see
+[Configuration](docs/production.md#configuration-from-environment).
 
-## Merchant identity
-
-`MerchantID` (`mid`) is set once on `Config` and sent on every request; `PrestoMRN` is set per request, so one
-client can use several `prestoMrn`s under its `mid`. To serve several merchants, build one client per `mid`
-(they can share the same keys) and route each request to the matching client.
-
-## Configuration from environment
+### 2. Start a payment
 
 ```go
-cfg, err := prestopay.ConfigFromEnv(os.Getenv)
-client, err := prestopay.New(cfg)
+payment, err := client.Payments.Init(r.Context(), prestopay.InitRequest{
+    PrestoMRN:             "YOUR_PRESTO_MRN",
+    TxnType:               prestopay.TxnTypeWebPay,
+    TxnRefNum:             orderID,
+    DisplayDesc:           "Order " + orderID,
+    Amount:                10_000, // minor units: MYR 100.00
+    CurrencyCode:          "MYR",
+    NotifyURL:             "https://your-app.example/presto/notify",
+    RedirectURL:           "https://your-app.example/presto/return/" + orderID,
+    AllowedPaymentMethods: []string{prestopay.PaymentMethodCard}, // Skip this unless you build your own payment selection page
+})
+if err != nil {
+    // See "When you don't know whether it worked" in docs/payments-and-errors.md.
+    return err
+}
+
+// Save payment.PaymentRefNum with the order, then send the shopper to Presto.
+http.Redirect(w, r, payment.PaymentURL, http.StatusFound)
 ```
 
-`ConfigFromEnv` builds a `Config` from these variables:
+`NotifyURL` must be reachable from the internet; on your own machine, use a tunnel such as ngrok.
 
-| Variable | Description |
-|----------|-------------|
-| `PRESTOPAY_ENV` or `PRESTOPAY_BASE_URL` | `staging` / `production`, or an explicit URL |
-| `PRESTOPAY_MID` | Merchant ID |
-| `PRESTOPAY_PRIVATE_KEY` or `PRESTOPAY_PRIVATE_KEY_FILE` | PKCS#8 PEM text, or a path to one |
-| `PRESTOPAY_PUBLIC_KEY` or `PRESTOPAY_PUBLIC_KEY_FILE` | Presto certificate (PEM or DER), or SPKI PEM |
+### 3. Show the result on your return page
 
-Onboarding delivers the merchant key as a PKCS#12 keystore; this SDK reads no PKCS#12 (no maintained Go parser
-exists), so convert it once with `openssl`:
-
-```bash
-openssl pkcs12 -in partner.p12 -nocerts -nodes -out partner-key.pem
-```
-
-**This command can exit non-zero on some keystores, but still work.** Some `.p12` files encrypt their
-certificate bag with an older algorithm (e.g. RC2-40-CBC) that OpenSSL 3 refuses by default, so it prints
-something like `digital envelope routines:inner_evp_generic_fetch:unsupported` and returns exit code 1 — but
-only *after* writing `partner-key.pem`, since the private key itself commonly uses an algorithm OpenSSL 3 does
-support. Check the output file: if it contains a `BEGIN PRIVATE KEY` block, the conversion succeeded and the
-error can be ignored. For a clean exit code, prepend `-legacy` (`openssl pkcs12 -legacy -in ...`); this needs the
-legacy provider available in your OpenSSL build (`openssl list -provider legacy -providers`), which stock builds
-sometimes omit.
-
-## Retries and idempotency
-
-`Init`, `Reverse`, and `Refund` are **not** safely retried automatically after the request may have reached
-Presto — the SDK retries them only when an `httptrace`-proven `RequestNotSent` shows nothing reached the
-gateway. Presto's own `Init` is idempotent by `TxnRefNum` (a duplicate call returns the existing payment's
-current status rather than creating a second record), but after an ambiguous failure the SDK still can't tell
-you that without asking, so reconcile with `Query`:
+The redirect only tells you the shopper came back, not whether they paid. Ask Presto:
 
 ```go
-res, err := client.Payments.Query(ctx, prestopay.QueryRequest{
+result, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
     PrestoMRN: "YOUR_PRESTO_MRN",
-    TxnRefNum: "order-123",
+    TxnRefNum: orderID,
 })
+if err != nil {
+    return err
+}
+
+switch result.PaymentStatus {
+case prestopay.PaymentStatusAuthorised:
+    // Paid: show the confirmation.
+case prestopay.PaymentStatusPendingAuthorise:
+    // Not finished yet: show "processing" and check again shortly.
+default:
+    // Not paid (Failed, Cancelled, Expired, ...): let the shopper try again.
+}
 ```
 
-`Query` is read-only and safe to retry; `Config.RetryReads` governs how many times and how it backs off for
-`Query`, and (for the `RequestNotSent` case only) for `Init`/`Reverse`/`Refund` too.
+### 4. Handle the webhook
 
-`Reverse` on a payment that's still `PendingAuthorise` (never paid) cancels it rather than failing — there's
-nothing to reverse financially. A `PendingAuthorise` payment expires (`PaymentStatus` becomes `Expired`) 15
-minutes after `Init` if not finalised by then — a confirmed business rule, consistent with real staging traffic.
-Once `Expired`, `Reverse` fails with error `1219` rather than cancelling it.
-
-You can request a refund for any payment method. Whether it succeeds depends on the payment method and the
-gateway's handling of that payment; some refunds require manual or offline processing. Check the response and
-reconcile the payment before treating a refund as complete. In one observed case, reversing a guest-checkout
-`AffinBank` payment returned business error `1242` ("Unable to refund to a guest account, please contact
-support"). That response does not establish a general restriction on refund requests.
-
-If you supply a custom `Config.HTTPClient` or `Transport`, never set an `Idempotency-Key` or
-`X-Idempotency-Key` header: `net/http` treats a POST carrying either as replayable and may silently resend it on
-a broken idle connection, which is exactly the transparent retry this SDK's idempotency guarantees depend on
-not happening.
-
-## Webhooks
+A webhook tells you something happened to a payment (`EventCode`, and `Success` for whether it worked), not the
+payment's resulting status, so query for that here too.
 
 ```go
-v, err := prestopay.NewWebhookVerifier(prestopay.WebhookConfig{
-    MerchantIDs:      []string{os.Getenv("PRESTOPAY_MID")},
-    PrestoPublicKeys: [][]byte{[]byte(os.Getenv("PRESTOPAY_PUBLIC_KEY"))},
-})
-
-http.HandleFunc("/presto/notify", func(w http.ResponseWriter, r *http.Request) {
-    event, err := v.VerifyRequest(r)
+http.HandleFunc("POST /presto/notify", func(w http.ResponseWriter, r *http.Request) {
+    event, err := verifier.VerifyRequest(r)
     if err != nil {
-        prestopay.WriteAck(w, prestopay.AckForError(err))
+        var sigErr *prestopay.SignatureError
+        if errors.As(err, &sigErr) {
+            w.WriteHeader(http.StatusUnauthorized) // forged, for another mid, or too old
+            return
+        }
+        prestopay.WriteAck(w, prestopay.AckForError(err)) // malformed body
         return
     }
-    if err := fulfilOnce(r.Context(), event.EventRefNum, event); err != nil {
-        prestopay.WriteAck(w, prestopay.AckResend)
-        return
+
+    if !orders.IsEventHandled(event.EventRefNum) {
+        payment, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
+            PrestoMRN:     event.PrestoMRN,
+            PaymentRefNum: event.PaymentRefNum,
+        })
+        if err != nil {
+            prestopay.WriteAck(w, prestopay.AckResend)
+            return
+        }
+        orders.UpdateStatus(event.TxnRefNum, payment.PaymentStatus, event.EventRefNum)
     }
     prestopay.WriteAck(w, prestopay.AckOK)
 })
 ```
 
-A verifier needs no private key, so a webhook-only service configures nothing else and never holds signing
-material. `MerchantIDs` is a set — Presto signs webhooks for every merchant with the same key, so the `mid`
-check is mandatory, not defensive.
+`AckOK` tells Presto the event is handled. `AckResend` asks Presto to deliver it again (after 1, 2, 5 and 10
+minutes), which you want when your own processing failed. Presto redelivers an event with the same
+`EventRefNum`, so record it once handled and skip it on later deliveries. See [Webhooks](docs/webhooks.md)
+for the details.
 
-A webhook says what happened to a payment (`EventCode`, and `Success` for whether it worked), not the payment's
-resulting status — a failed `Refunded`, for example, leaves the payment as it was. `NotifyEvent` therefore
-carries no status. When the handler needs it, call `client.Payments.Query` with the event's `PrestoMRN` and
-`PaymentRefNum`; if that fails, `AckForError` answers `AckResend` so Presto delivers the event again. Mark
-`EventRefNum` as processed only after the query succeeds, so that redelivery isn't mistaken for a duplicate.
+Update the order the same way from your return page and your webhook: whichever arrives first records the
+status, and the other finds it already done.
 
-## Errors
+## Payment statuses
 
-Implemented today. Every error type returned by this package satisfies:
+`PaymentStatus` is one of these strings; compare it with the `prestopay.PaymentStatus*` constants.
 
-```go
-type Error interface {
-    error
-    Operation() Operation
-    MayHaveTakenEffect() bool
-    ReconcileBy() (ReconcileKey, bool)
-}
-```
+| Status | Meaning | What to do |
+|--------|---------|------------|
+| `PendingAuthorise` | Created; the shopper hasn't finished paying | Wait. It becomes `Expired` if not paid within 15 minutes of `Init` |
+| `Authorised` | Paid | Fulfil the order |
+| `Failed` | The payment attempt failed | Don't fulfil; let the shopper try again with a new `TxnRefNum` |
+| `Cancelled` | Cancelled before it was paid, for example by `Reverse` | Don't fulfil |
+| `Expired` | Not paid within 15 minutes | Don't fulfil; start a new payment if the shopper returns |
+| `PendingReverse` | A reversal is in progress | Query again later |
+| `Reversed` | The payment was reversed | Treat the order as cancelled |
+| `PendingRefund` | A refund is in progress | Query again later |
+| `PartialRefunded` | Part of the amount was refunded | Update the order's refunded amount |
+| `Refunded` | The full amount was refunded | Treat the order as refunded |
 
-| Type | When | Extra fields |
-|------|------|---------------|
-| `*ConfigError` | Invalid config or request input, including invalid UTF-8 | `Field` |
-| `*TransportError` | Network failure, timeout, or context cancellation | `RequestNotSent` |
-| `*APIError` | Non-200 status (`Kind: KindHTTP`) or `success: false` (`Kind: KindBusiness`) | `Kind`, `HTTPStatus`, `ErrorCode`, `ErrorMessage`, `RawBody`; `Canonical` on codes `1006`/`1007`, observed clock offset on `1005` |
-| `*SignatureError` | Missing or invalid signature, wrong webhook `mid`, stale webhook `ts` | `Source`, `Canonical` |
-| `*ResponseError` | Malformed body, missing required field, bad `ts`, echo mismatch | `Source`, `RawBody` |
+The gateway can add statuses, so handle an unknown value without failing.
 
-Every type implements `Unwrap`, so `errors.Is` works through them, and inspection is `errors.As`.
-`MayHaveTakenEffect` is decided where the error is constructed — a 500 on `Init` is indeterminate, a 500 on
-`Query` means nothing happened — and `ReconcileBy` carries the lookup key for a follow-up `Query` once that
-operation exists.
+## Next steps
 
-`RawBody` and `Canonical` can carry PII (`cardBin`, `cardSummary`, `receiptEmail`, `receiptName`); `Error()`
-redacts them unless `Config.ShowErrorBodies` is `true`. The fields themselves are always populated regardless.
-
-## Samples
-
-- [examples/net-http/](examples/net-http/) — a runnable demo against Presto's real staging gateway using only
-  `net/http` and `html/template`: a checkout page with a hosted-vs-self-selected payment method toggle, a return
-  page, JSON endpoints for query/reverse/refund, and webhook handling that dedupes on `EventRefNum`.
-- [examples/chi/](examples/chi/) — the same demo routed with [chi](https://github.com/go-chi/chi) instead of the
-  stdlib mux, showing the SDK is router-agnostic.
-- [examples/lambda/](examples/lambda/) — a webhook-only receiver deployed as an AWS Lambda function behind API
-  Gateway, holding no private key since verification needs none.
-
-`examples/chi` and `examples/lambda` have their own `go.mod` with real third-party dependencies, depending on the
-tagged `v0.2.0` release like any other consumer would — the SDK module itself stays dependency-free.
-`examples/net-http` has no `go.mod` of its own; it's part of the root module and always builds against the
-current source.
+- [Payments and errors](docs/payments-and-errors.md): look up, reverse and refund payments; handle errors and
+  timeouts safely.
+- [Webhooks](docs/webhooks.md): replies, redelivery, deduplication and the freshness window.
+- [Production](docs/production.md): configuration, several merchants, custom HTTP clients, the go-live
+  checklist and troubleshooting.
+- Examples, runnable against Presto staging:
+  - [`examples/net-http`](examples/net-http/): a checkout with a return page and webhook handling, using only
+    the standard library.
+  - [`examples/chi`](examples/chi/): the same checkout routed with [chi](https://github.com/go-chi/chi).
+  - [`examples/lambda`](examples/lambda/): a webhook-only receiver on AWS Lambda, holding no private key.
 
 ## Contributing
 
-Building, testing, code style, and the release process live in [CONTRIBUTING.md](CONTRIBUTING.md).
+Building, testing, code style and the release process are in [CONTRIBUTING.md](CONTRIBUTING.md). Report
+security issues as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
 ## License
 
-Apache License 2.0 — see [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).

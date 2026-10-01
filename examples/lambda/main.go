@@ -6,8 +6,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"os"
 
@@ -42,6 +44,10 @@ func handleRequest(ctx context.Context, req events.APIGatewayProxyRequest) (even
 	event, err := verifier.Verify([]byte(req.Body))
 	if err != nil {
 		log.Printf("webhook verification failed: %v", err)
+		var sigErr *prestopay.SignatureError
+		if errors.As(err, &sigErr) {
+			return events.APIGatewayProxyResponse{StatusCode: http.StatusUnauthorized}, nil
+		}
 		return ackResponse(prestopay.AckForError(err)), nil
 	}
 

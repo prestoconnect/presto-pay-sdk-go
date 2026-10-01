@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- The README is now a getting-started guide: creating your key pair and sending Presto the `.der` public key,
+  how a payment flows, a four-step quick start and a payment status table. Reference material moved to
+  `docs/` (payments and errors, webhooks, production).
+- The examples answer HTTP 401 to a webhook that fails with a `*SignatureError`, instead of acknowledging it.
+- `LoadPrivateKey`'s hint for a non-PEM input no longer assumes the key came from an onboarding keystore.
+
 ## 0.3.0 - 2026-09-30
 
 ### Changed
