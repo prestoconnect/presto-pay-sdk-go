@@ -35,7 +35,7 @@ type paymentMethodOption struct {
 }
 
 var paymentMethodChoices = []paymentMethodOption{
-	{Code: prestopay.PaymentMethodCard, Name: "Credit / debit card", Icon: "fa-credit-card"},
+	{Code: prestopay.PaymentMethodPmPgCard, Name: "Credit / debit card", Icon: "fa-credit-card"},
 	{Code: prestopay.PaymentMethodTouchNGoEWallet, Name: "Touch 'n Go eWallet", Icon: "fa-wallet"},
 	{Code: prestopay.PaymentMethodGrabPay, Name: "GrabPay", Icon: "fa-wallet"},
 	{Code: prestopay.PaymentMethodMaybank, Name: "Maybank FPX", Icon: "fa-building-columns"},

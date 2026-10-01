@@ -139,7 +139,7 @@ payment, err := client.Payments.Init(r.Context(), prestopay.InitRequest{
     CurrencyCode:          "MYR",
     NotifyURL:             "https://your-app.example/presto/notify",
     RedirectURL:           "https://your-app.example/presto/return/" + orderID,
-    AllowedPaymentMethods: []string{prestopay.PaymentMethodCard}, // Skip this unless you build your own payment selection page
+    AllowedPaymentMethods: []string{prestopay.PaymentMethodPmPgCard}, // Skip this unless you build your own payment selection page
 })
 if err != nil {
     // See "When you don't know whether it worked" in docs/payments-and-errors.md.
