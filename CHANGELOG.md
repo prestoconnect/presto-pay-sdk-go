@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+## 0.3.1 - 2026-10-01
+
 ### Changed
 
 - The README is now a getting-started guide: creating your key pair and sending Presto the `.der` public key,

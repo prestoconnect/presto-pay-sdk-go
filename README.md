@@ -24,7 +24,7 @@ handle the gateway's signature scheme yourself.
 ## Install
 
 ```bash
-go get github.com/prestoconnect/presto-pay-sdk-go@v0.3.0
+go get github.com/prestoconnect/presto-pay-sdk-go@v0.3.1
 ```
 
 The package is `github.com/prestoconnect/presto-pay-sdk-go/prestopay`.
