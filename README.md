@@ -171,7 +171,7 @@ case prestopay.PaymentStatusAuthorised:
 case prestopay.PaymentStatusPendingAuthorise:
     // Not finished yet: show "processing" and check again shortly.
 default:
-    // Not paid (Failed, Cancelled, Expired, ...): let the shopper try again.
+    // Not paid (Failed, Cancelled, Expired, ...).
 }
 ```
 
@@ -224,7 +224,7 @@ status, and the other finds it already done.
 |--------|---------|------------|
 | `PendingAuthorise` | Created; the shopper hasn't finished paying | Wait. It becomes `Expired` if not paid within 15 minutes of `Init` |
 | `Authorised` | Paid | Fulfil the order |
-| `Failed` | The payment attempt failed | Don't fulfil; let the shopper try again with a new `TxnRefNum` |
+| `Failed` | The payment attempt failed | Don't fulfil |
 | `Cancelled` | Cancelled before it was paid, for example by `Reverse` | Don't fulfil |
 | `Expired` | Not paid within 15 minutes | Don't fulfil; start a new payment if the shopper returns |
 | `PendingReverse` | A reversal is in progress | Query again later |
