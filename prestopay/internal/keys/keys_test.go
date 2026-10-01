@@ -107,7 +107,7 @@ func TestLoadPrestoPublicKey_CertificatePEM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPrestoPublicKey: %v", err)
 	}
-	if pub.N.Cmp(key.PublicKey.N) != 0 {
+	if pub.N.Cmp(key.N) != 0 {
 		t.Fatal("loaded public key does not match original")
 	}
 }
@@ -119,7 +119,7 @@ func TestLoadPrestoPublicKey_CertificateDER(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPrestoPublicKey (DER): %v", err)
 	}
-	if pub.N.Cmp(key.PublicKey.N) != 0 {
+	if pub.N.Cmp(key.N) != 0 {
 		t.Fatal("loaded public key does not match original")
 	}
 }
@@ -130,7 +130,7 @@ func TestLoadPrestoPublicKey_SPKIPEM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPrestoPublicKey (SPKI): %v", err)
 	}
-	if pub.N.Cmp(key.PublicKey.N) != 0 {
+	if pub.N.Cmp(key.N) != 0 {
 		t.Fatal("loaded public key does not match original")
 	}
 }
