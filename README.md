@@ -210,8 +210,9 @@ http.HandleFunc("POST /presto/notify", func(w http.ResponseWriter, r *http.Reque
 })
 ```
 
-`AckOK` tells Presto the event is handled. `AckResend` asks Presto to deliver it again (after 1, 2, 5 and 10
-minutes), which you want when your own processing failed.
+`AckOK` tells Presto the event is handled. `AckResend` asks Presto to deliver it again, which you want when your
+own processing failed. Presto resends with a backoff of 2, 4, 8, 16, 32, 64, 128, 256, 512 and 1024 minutes
+between attempts.
 
 The same event can arrive more than once, so `ApplyStatus` checks the order, not the event: it finalises the
 order only if the order hasn't been finalised yet, and fulfils only on the change into `Authorised`. A

@@ -57,8 +57,9 @@ Reply HTTP 200 with a JSON body, using `prestopay.WriteAck`:
 | `prestopay.AckOK` | `{"resend":false}` | You've updated the order, or it was already in that status |
 | `prestopay.AckResend` | `{"resend":true}` | Your own processing failed, for example the `Query` or your database |
 
-Presto retries 1, 2, 5 and 10 minutes after the first attempt, so an event is delivered at most five times over
-about 18 minutes. Only ask for a resend when trying again could succeed.
+Presto resends a notification with a backoff of 2, 4, 8, 16, 32, 64, 128, 256, 512 and 1024 minutes between
+attempts, so an event is delivered at most 11 times over about 34 hours. Only ask for a resend when trying again
+could succeed.
 
 `prestopay.AckForError(err)` picks the ack for an error: `AckOK` for a webhook that failed verification, and
 `AckResend` for anything else, including a failed `Query` inside your handler.

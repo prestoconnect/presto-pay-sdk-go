@@ -19,7 +19,7 @@ defined in one place regardless of which example calls it.
 
 A real deployment would query the payment and apply its status to the order with a conditional update that
 finalises the order only if it hasn't been finalised yet, since Presto redelivers an unacknowledged webhook up to
-five times; this demo only logs.
+ten times over about 34 hours; this demo only logs.
 
 ## Build and package
 
