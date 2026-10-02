@@ -237,7 +237,7 @@ The gateway can add statuses, so handle an unknown value without failing.
 
 ## Next steps
 
-- [Payments and errors](docs/payments-and-errors.md): look up, reverse and refund payments; handle errors and
+- [Payments and errors](docs/payments-and-errors.md): query, reverse and refund payments; handle errors and
   timeouts safely.
 - [Webhooks](docs/webhooks.md): replies, redelivery, deduplication and the freshness window.
 - [Production](docs/production.md): configuration, several merchants, custom HTTP clients, the go-live
