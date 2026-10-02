@@ -51,9 +51,9 @@ func handleRequest(ctx context.Context, req events.APIGatewayProxyRequest) (even
 		return ackResponse(prestopay.AckForError(err)), nil
 	}
 
-	// A real function would look up event.EventRefNum in a table with a
-	// uniqueness constraint here, and only fulfil on the first sighting —
-	// Presto redelivers an unacknowledged webhook up to five times.
+	// A real function would query the payment here and apply its status to
+	// the order with a conditional update that finalises it only once, so
+	// Presto's redeliveries of the same webhook fulfil nothing twice.
 	// A webhook says what happened, not the payment's resulting status: a
 	// function that needs the status calls Payments.Query here, and answers
 	// AckForError(err) if that fails so Presto delivers the event again.

@@ -194,25 +194,29 @@ http.HandleFunc("POST /presto/notify", func(w http.ResponseWriter, r *http.Reque
         return
     }
 
-    if !orders.IsEventHandled(event.EventRefNum) {
-        payment, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
-            PrestoMRN:     event.PrestoMRN,
-            PaymentRefNum: event.PaymentRefNum,
-        })
-        if err != nil {
-            prestopay.WriteAck(w, prestopay.AckResend)
-            return
-        }
-        orders.UpdateStatus(event.TxnRefNum, payment.PaymentStatus, event.EventRefNum)
+    payment, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
+        PrestoMRN:     event.PrestoMRN,
+        PaymentRefNum: event.PaymentRefNum,
+    })
+    if err != nil {
+        prestopay.WriteAck(w, prestopay.AckResend)
+        return
+    }
+    if err := orders.ApplyStatus(r.Context(), event.TxnRefNum, payment.PaymentStatus); err != nil {
+        prestopay.WriteAck(w, prestopay.AckResend)
+        return
     }
     prestopay.WriteAck(w, prestopay.AckOK)
 })
 ```
 
 `AckOK` tells Presto the event is handled. `AckResend` asks Presto to deliver it again (after 1, 2, 5 and 10
-minutes), which you want when your own processing failed. Presto redelivers an event with the same
-`EventRefNum`, so record it once handled and skip it on later deliveries. See [Webhooks](docs/webhooks.md)
-for the details.
+minutes), which you want when your own processing failed.
+
+The same event can arrive more than once, so `ApplyStatus` checks the order, not the event: it finalises the
+order only if the order hasn't been finalised yet, and fulfils only on the change into `Authorised`. A
+redelivery then finds the order already in that status and changes nothing. See
+[Webhooks](docs/webhooks.md#handling-redeliveries) for the details.
 
 Update the order the same way from your return page and your webhook: whichever arrives first records the
 status, and the other finds it already done.
@@ -242,7 +246,7 @@ The gateway can add statuses, so handle an unknown value without failing.
   code the SDK doesn't list yet.
 - [Payments and errors](docs/payments-and-errors.md): query, reverse and refund payments; handle errors and
   timeouts safely.
-- [Webhooks](docs/webhooks.md): replies, redelivery, deduplication and the freshness window.
+- [Webhooks](docs/webhooks.md): replies, redelivery, guarding the order update and the freshness window.
 - [Production](docs/production.md): configuration, several merchants, custom HTTP clients, the go-live
   checklist and troubleshooting.
 - Examples, runnable against Presto staging:

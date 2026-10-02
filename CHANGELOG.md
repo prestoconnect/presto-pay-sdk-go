@@ -4,6 +4,14 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Changed
+
+- Webhook guidance now guards on the order record instead of deduplicating on `EventRefNum`: the handler
+  queries the payment on every delivery and applies its status with a conditional update that finalises an
+  order only once and fulfils only on the change into `Authorised`. Updated the README, `docs/webhooks.md`,
+  `docs/production.md`, the `MaxTimestampAge` doc comment, and the `net-http`, `chi` and `lambda` examples,
+  whose return page and webhook now share one guarded update.
+
 ### Added
 
 - New `docs/payment-methods.md`, linked from the README: every payment method code with its SDK constant,

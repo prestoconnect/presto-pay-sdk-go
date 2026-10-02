@@ -17,8 +17,9 @@ verified event and acknowledges with `AckOK`/`AckForError`, answering HTTP 401 f
 `httptest.ResponseRecorder` and copying the status/body into the Lambda response — the notify-ack contract stays
 defined in one place regardless of which example calls it.
 
-A real deployment would look up `event.EventRefNum` in a table with a uniqueness constraint before doing any
-fulfilment work, since Presto redelivers an unacknowledged webhook up to five times; this demo only logs.
+A real deployment would query the payment and apply its status to the order with a conditional update that
+finalises the order only if it hasn't been finalised yet, since Presto redelivers an unacknowledged webhook up to
+five times; this demo only logs.
 
 ## Build and package
 

@@ -54,7 +54,7 @@ Reply HTTP 200 with a JSON body, using `prestopay.WriteAck`:
 
 | Ack | Body | When to send it |
 |-----|------|-----------------|
-| `prestopay.AckOK` | `{"resend":false}` | You've recorded the event, or had already recorded it earlier |
+| `prestopay.AckOK` | `{"resend":false}` | You've updated the order, or it was already in that status |
 | `prestopay.AckResend` | `{"resend":true}` | Your own processing failed, for example the `Query` or your database |
 
 Presto retries 1, 2, 5 and 10 minutes after the first attempt, so an event is delivered at most five times over
@@ -67,15 +67,25 @@ Reply quickly. Record the event and reply, and do slow work such as emails or fu
 
 ## Handling redeliveries
 
-The same event can arrive more than once, for example after you ask for a resend. Every delivery of an event
-has the same `EventRefNum`, so:
+The same event can arrive more than once, for example after you ask for a resend, and your return page may
+update the same order first. Guard on the order record rather than on the event:
 
-- record `EventRefNum` once you've handled the event, under a unique constraint in your database;
-- skip events you've already recorded, and still reply `AckOK`;
-- record it only after the `Query` succeeds, so a failed attempt isn't mistaken for a handled one on
-  redelivery.
+- `Query` the payment on every delivery, then apply its status to the order in one conditional update, so
+  that only one caller can finalise it:
 
-Keep recorded `EventRefNum`s for at least as long as the redelivery schedule (about 18 minutes).
+  ```sql
+  UPDATE orders SET status = $1 WHERE txn_ref_num = $2 AND status = 'PendingAuthorise'
+  ```
+
+- fulfil only when that update changed a row and the new status is `Authorised`, and create the fulfilment
+  job in the same transaction;
+- once an order is finalised, apply only the statuses that can follow it (`PendingRefund`, `PartialRefunded`,
+  `Refunded`, `PendingReverse`, `Reversed`), never fulfil again, and never let an older status overwrite a
+  newer one;
+- reply `AckOK` whether or not anything changed.
+
+A redelivery, a replay, or a webhook that arrives after the return page then finds the order already in that
+status and does nothing.
 
 ## The freshness window
 
@@ -83,8 +93,9 @@ The verifier rejects a webhook whose timestamp is more than 15 minutes from your
 can't be replayed later. Each redelivery carries a fresh timestamp, so redeliveries pass. Keep your server's
 clock in sync with NTP.
 
-To change the window, set `WebhookConfig.MaxTimestampAge`. Widen it only if you deduplicate on
-`EventRefNum`, since that becomes your protection against replays.
+To change the window, set `WebhookConfig.MaxTimestampAge`. Widen it only if your order update is guarded as
+described in [Handling redeliveries](#handling-redeliveries), since that becomes your protection against
+replays.
 
 ## Several merchants, and webhook-only services
 

@@ -46,8 +46,8 @@ type WebhookConfig struct {
 	PrestoPublicKeys [][]byte
 
 	// MaxTimestampAge is the freshness window; zero means 15 minutes.
-	// Widening or disabling it is safe only if the caller deduplicates by
-	// EventRefNum.
+	// Widening or disabling it is safe only if the caller's order update
+	// finalises an order only once, so a replayed webhook changes nothing.
 	MaxTimestampAge time.Duration
 
 	// ShowErrorBodies includes RawBody/Canonical in Error() strings, same as

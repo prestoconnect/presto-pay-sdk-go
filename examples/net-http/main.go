@@ -81,7 +81,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", handleHome(st))
 	mux.HandleFunc("POST /checkout", handleCheckout(client, prestoMRN, baseURL))
-	mux.HandleFunc("GET /return/{txnRefNum}", handleReturn(client, prestoMRN))
+	mux.HandleFunc("GET /return/{txnRefNum}", handleReturn(client, prestoMRN, st))
 	mux.HandleFunc("GET /payments/{paymentRefNum}", handleQuery(client, prestoMRN))
 	mux.HandleFunc("POST /payments/{paymentRefNum}/reverse", handleReverse(client, prestoMRN))
 	mux.HandleFunc("POST /payments/{paymentRefNum}/refund", handleRefund(client, prestoMRN))
@@ -174,7 +174,7 @@ func classifyPaymentStatus(status string) returnStatus {
 	}
 }
 
-func handleReturn(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
+func handleReturn(client *prestopay.Client, prestoMRN string, st *store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		txnRefNum := r.PathValue("txnRefNum")
 		res, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
@@ -197,6 +197,7 @@ func handleReturn(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
 		if err != nil {
 			data.Error = err.Error()
 		} else {
+			applyPaymentStatus(st, txnRefNum, res.PaymentStatus)
 			status := classifyPaymentStatus(res.PaymentStatus)
 			data.PaymentRefNum = res.PaymentRefNum
 			data.PaymentStatus = res.PaymentStatus
@@ -260,10 +261,9 @@ func handleRefund(client *prestopay.Client, prestoMRN string) http.HandlerFunc {
 	}
 }
 
-// handleNotify dedupes on EventRefNum before doing any fulfilment work, since
-// Presto redelivers an undelivered webhook up to five times: acking an
-// already-seen delivery with AckOK (rather than refulfilling) is what keeps
-// that safe.
+// handleNotify queries the payment on every delivery and applies its status
+// through the same guarded update as the return page, so a redelivery finds
+// the order already in that status and nothing is fulfilled twice.
 func handleNotify(client *prestopay.Client, verifier *prestopay.WebhookVerifier, st *store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		event, err := verifier.VerifyRequest(r)
@@ -277,24 +277,16 @@ func handleNotify(client *prestopay.Client, verifier *prestopay.WebhookVerifier,
 			prestopay.WriteAck(w, prestopay.AckForError(err))
 			return
 		}
-		// A webhook says what happened, not the payment's resulting status, so
-		// ask Presto. The event is only marked as seen after this succeeds: if
-		// the query fails, AckForError asks for a resend, and that redelivery
-		// must not be mistaken for a duplicate.
 		payment, err := client.Payments.Query(r.Context(), prestopay.QueryRequest{
 			PrestoMRN:     event.PrestoMRN,
 			PaymentRefNum: event.PaymentRefNum,
 		})
 		if err != nil {
-			log.Printf("webhook eventRefNum=%s: query failed, asking Presto to resend: %v", event.EventRefNum, err)
+			log.Printf("webhook txnRefNum=%s: query failed, asking Presto to resend: %v", event.TxnRefNum, err)
 			prestopay.WriteAck(w, prestopay.AckForError(err))
 			return
 		}
-		if !st.firstDelivery(event.EventRefNum) {
-			log.Printf("duplicate webhook delivery for eventRefNum=%s; acking without refulfilling", event.EventRefNum)
-			prestopay.WriteAck(w, prestopay.AckOK)
-			return
-		}
+		applyPaymentStatus(st, event.TxnRefNum, payment.PaymentStatus)
 		st.recordEvent(recentEvent{
 			ReceivedAt:    time.Now().Format(time.RFC3339),
 			EventCode:     event.EventCode,
@@ -304,6 +296,18 @@ func handleNotify(client *prestopay.Client, verifier *prestopay.WebhookVerifier,
 		log.Printf("webhook: prestoMrn=%s paymentRefNum=%s eventCode=%s success=%t queried paymentStatus=%s",
 			event.PrestoMRN, event.PaymentRefNum, event.EventCode, event.Success, payment.PaymentStatus)
 		prestopay.WriteAck(w, prestopay.AckOK)
+	}
+}
+
+func applyPaymentStatus(st *store, txnRefNum, paymentStatus string) {
+	changed, fulfil := st.applyStatus(txnRefNum, paymentStatus)
+	switch {
+	case fulfil:
+		log.Printf("order %s: %s, fulfilling", txnRefNum, paymentStatus)
+	case changed:
+		log.Printf("order %s: now %s", txnRefNum, paymentStatus)
+	default:
+		log.Printf("order %s: already finalised, %s changes nothing", txnRefNum, paymentStatus)
 	}
 }
 
@@ -345,25 +349,56 @@ type recentEvent struct {
 
 const maxRecentEvents = 20
 
-// store is the demo's dedupe and recent-activity state. A real merchant
-// would use its database's uniqueness constraints instead of an in-memory
-// map, and would not need the recent-events list at all.
+// store is the demo's order and recent-activity state. A real merchant keeps
+// the order status in its database and makes applyStatus one conditional
+// UPDATE, so that only one of the return page and the webhook finalises it.
 type store struct {
 	mu     sync.Mutex
-	seen   map[string]bool
+	orders map[string]string
 	events []recentEvent
 }
 
-func newStore() *store { return &store{seen: make(map[string]bool)} }
+func newStore() *store { return &store{orders: make(map[string]string)} }
 
-func (s *store) firstDelivery(eventRefNum string) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.seen[eventRefNum] {
+var statusesAfterPayment = map[string]bool{
+	prestopay.PaymentStatusAuthorised:      true,
+	prestopay.PaymentStatusPendingReverse:  true,
+	prestopay.PaymentStatusPendingRefund:   true,
+	prestopay.PaymentStatusPartialRefunded: true,
+	prestopay.PaymentStatusReversed:        true,
+	prestopay.PaymentStatusRefunded:        true,
+}
+
+// canChangeStatus lets an unfinalised order take any status, and a paid order
+// move only among the statuses that can follow payment. Failed, Cancelled,
+// Expired, Reversed and Refunded are final, so a stale result can't undo them.
+func canChangeStatus(current, next string) bool {
+	switch current {
+	case next:
+		return false
+	case "", prestopay.PaymentStatusPendingAuthorise:
+		return true
+	case prestopay.PaymentStatusAuthorised, prestopay.PaymentStatusPendingReverse,
+		prestopay.PaymentStatusPendingRefund, prestopay.PaymentStatusPartialRefunded:
+		return statusesAfterPayment[next]
+	default:
 		return false
 	}
-	s.seen[eventRefNum] = true
-	return true
+}
+
+// applyStatus reports whether the order's status changed, and whether this
+// change is the one that pays the order and so should fulfil it.
+func (s *store) applyStatus(txnRefNum, next string) (changed, fulfil bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	current := s.orders[txnRefNum]
+	if !canChangeStatus(current, next) {
+		return false, false
+	}
+	s.orders[txnRefNum] = next
+	paidNow := next == prestopay.PaymentStatusAuthorised &&
+		(current == "" || current == prestopay.PaymentStatusPendingAuthorise)
+	return true, paidNow
 }
 
 func (s *store) recordEvent(e recentEvent) {

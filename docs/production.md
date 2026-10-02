@@ -76,8 +76,8 @@ carrying either header as safe to replay, and may resend it on a broken idle con
 - [ ] Load the private key from a secret store, not from source control or the image.
 - [ ] Make `NotifyURL` a public HTTPS URL that Presto can reach.
 - [ ] Have your return page `Query` the payment instead of trusting the redirect.
-- [ ] Have your webhook handler `Query` the payment, deduplicate on `EventRefNum` under a unique constraint,
-      return 401 for a `*SignatureError`, and reply `AckResend` when your own processing fails.
+- [ ] Have your webhook handler `Query` the payment, apply its status to the order with a guarded
+      update that finalises an order only once and fulfils only on the change into `Authorised`, return 401 for a `*SignatureError`, and reply `AckResend` when your own processing fails.
 - [ ] After a timeout or server error, call `Init` again with the same `TxnRefNum`, and query before retrying
       `Reverse` or `Refund`, as in
       [Payments and errors](payments-and-errors.md#when-you-dont-know-whether-it-worked).
