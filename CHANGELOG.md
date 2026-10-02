@@ -4,6 +4,13 @@ All notable changes to this project are documented in this file.
 
 ## Unreleased
 
+### Added
+
+- New `docs/payment-methods.md`, linked from the README: every payment method code with its SDK constant,
+  a note that Presto enables payment methods per merchant during onboarding, which methods need a Presto
+  account (the PrestoPay eWallet and Credits, `Card` and the loyalty programmes), which are legacy
+  (`TouchNGo`, `BigLife`), and how to pass a code the SDK doesn't list yet.
+
 ## 0.3.2 - 2026-10-01
 
 Documentation only; no change to the SDK's behaviour.
